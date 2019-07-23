@@ -13,8 +13,25 @@ from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
 
-# Global variables
-ms_data = None # variable to hold input data matrix
+# Global variables related to input data
+data_vis = None # variable to hold input data matrix
+data_nbl=None
+data_ntime=None
+data_inttime=None
+data_nchan=None
+data_chanwidth=None
+data_flag=None
+data_flag_row=None
+
+# Global variables to be computed
+baselinenoise = None
+
+#other global vars that will be set through command-line
+hypo=None
+npsrc=None
+ngsrc=None
+ndata_valid=None
+
 
 def create_parser():
     p = argparse.ArgumentParser()
@@ -24,9 +41,9 @@ def create_parser():
                    help="Invert UVW coordinates. Necessary to compare"
                         "codex vis against MeqTrees-generated vis")
     p.add_argument('--hypo', type=int, choices=[0,1,2], required=True)
-    p.add_argument('--npsrc', type=int, default=0, required=True)
-    p.add_argument('--ngsrc', type=int, default=1, required=True)
-    p.add_argument('--npar', type=int, default=6, required=True)
+    p.add_argument('--npsrc', type=int, required=True)
+    p.add_argument('--ngsrc', type=int, required=True)
+    p.add_argument('--npar', type=int, required=True)
     p.add_argument('--basedir', type=str, required=True)
     p.add_argument('--fileroot', type=str, required=True)
 
@@ -41,6 +58,31 @@ def loglike(theta):
     """
     Compute the loglikelihood function
     """
+
+    # Find total number of visibilities
+    ndata = 8*slvr.ntime*slvr.nbl*slvr.nchan # 8 because each polarisation has two real numbers (real & imaginary)
+    flag_ll = np.logical_not(flag[:,0,0])
+    number_flagged = np.where(flag_ll == False)[0].shape[0] * 8
+    ndata_valid = ndata - number_flagged
+    print 'Number of valid visibilities: ', ndata,'-',number_flagged,'=',ndata_valid
+
+    # Set visibility weights
+    if use_weight_vector:
+        weight_vector=np.zeros(ndata/2).astype(slvr.ft)\
+            .reshape(slvr.weight_vector_shape) # ndata/2.0 because each vis. is (real+i*imag); so now, the array has ntime*nbl*nchan*4 elem. 
+        baselinenoise = np.zeros((slvr.nbl))
+        basecount = 0;
+        for i in np.arange(slvr.na):
+          for j in np.arange(i+1,slvr.na):
+            sefd = np.sqrt(sefdlist[i]*sefdlist[j]);
+            #baselinenoise[basecount] = sefd/math.sqrt(chanwid*dt_val[basecount]) #INI:Removed the sq(2) from the denom. It's for 2 pols.
+            baselinenoise[basecount] = sefd/math.sqrt(2*chanwid*dt_val[basecount]) #INI:ADDED the sq(2) bcoz MeqS uses this convention
+            basecount += 1;
+
+        for ibl in np.arange(slvr.nbl):
+            weight_vector[:,:,ibl,:] = 1.0 / (baselinenoise[ibl]*baselinenoise[ibl])
+
+
 
     return loglike, []
 
@@ -70,37 +112,34 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global ms_data
+    global data_vis, data_nbl, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row
 
     ####### Read data from MS
     tab = pt.table(args.ms)
-    ms_data = tab.getcol(args.col)
+    data_vis = tab.getcol(args.col)
     tab.close()
 
     # Create baseline noise array ------------------------
 
     anttab = pt.table(args.ms+'/ANTENNA')
     stations = anttab.getcol('STATION')
-    numants = len(stations)
-    numbaselines = int((numants*(numants-1))/2)
-    print('nbl: ',numbaselines)
+    nant = len(stations)
+    data_nbl = int((nant*(nant-1))/2)
     anttab.close()
  
     tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: exclude autocorrs
-    dt_val = tab.getcol('EXPOSURE',0,numbaselines) # jan26, for VLBA sims
-    print('dt_val: ',dt_val)
+    data_inttime = tab.getcol('EXPOSURE', 0, data_nbl) # jan26, for VLBA sims
 
     #get channel width
     freqtab = pt.table(args.ms+'/SPECTRAL_WINDOW')
-    chanwid = freqtab.getcol('CHAN_WIDTH')[0,0];
-    nchan = freqtab.getcol('NUM_CHAN')[0]
-    print("chanwid (Hz), numants, nchan: ", chanwid, numants, nchan)
+    data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
+    data_nchan = freqtab.getcol('NUM_CHAN')[0]
     freqtab.close();
 
     #get flags from MS
-    flag = tab.getcol('FLAG')
-    flag_row = tab.getcol('FLAG_ROW')
-    flag = np.logical_or(flag, flag_row[:,np.newaxis,np.newaxis])
+    data_flag = tab.getcol('FLAG')
+    data_flag_row = tab.getcol('FLAG_ROW')
+    data_flag = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
 
     tab.close()
 
@@ -115,7 +154,7 @@ def main(args):
     settings.read_resume = False
     settings.seed = seed    
 
-    #ppc.run_polychord(loglike, n_params, 0, settings, prior=prior_transform)
+    #ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)
     loglike(0)
 
     return 0
