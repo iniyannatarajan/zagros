@@ -10,6 +10,7 @@ import pyrap.tables as pt
 import pypolychord as ppc
 from pypolychord.settings import PolyChordSettings
 import numpy as np
+import cupy as cp
 #from mpi4py import MPI
 from math import sqrt
 import logging
@@ -24,10 +25,12 @@ uas2rad = 1e-6 * deg2rad / 3600.0;
 sqrtTwo=sqrt(2.0)
 
 #------------------------------------------------------------------------------
-# Command-line options
+# Variables for assigning weights to visibilities
 
-sigmaSim=None # For the constant delay VLBA sim, use this as the sefd value in Jy.
-#Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
+sigmaSim=None #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
+compute_weight_vector=True
+sefdlist=[6000,1300,560,220,2000,1600,5000,1600,4500] # station SEFDs in Jy - from EHT2017_station_info
+
 
 # Codex-africanus settings
 
@@ -53,4 +56,3 @@ dymin=-10; dymax= -110; # uas
 #Smu=0.149124;Ssigma=1e-4;
 
 #refchan_delay=0 # index (in the MS spw table) of reference channel for delays
-sefdlist=[6000,1300,560,220,2000,1600,5000,1600,4500] # station SEFDs in Jy - from EHT2017_station_info

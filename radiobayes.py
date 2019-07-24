@@ -4,9 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
 import argparse
-import numpy as np
 import pyrap.tables as pt
 
 from vardefs import *
@@ -16,12 +14,15 @@ from africanus.rime.cuda import phase_delay, predict_vis
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
 data_nbl=None
+data_timearr=None
 data_ntime=None
 data_inttime=None
 data_nchan=None
 data_chanwidth=None
 data_flag=None
 data_flag_row=None
+data_ant1=None
+data_ant2=None
 
 # Global variables to be computed
 baselinenoise = None
@@ -60,8 +61,8 @@ def loglike(theta):
     """
 
     # Find total number of visibilities
-    ndata = 8*slvr.ntime*slvr.nbl*slvr.nchan # 8 because each polarisation has two real numbers (real & imaginary)
-    flag_ll = np.logical_not(flag[:,0,0])
+    ndata = 8*data_ntime*data_nbl*data_nchan # 8 because each polarisation has two real numbers (real & imaginary)
+    flag_ll = np.logical_not(data_flag[:,0,0])
     number_flagged = np.where(flag_ll == False)[0].shape[0] * 8
     ndata_valid = ndata - number_flagged
     print 'Number of valid visibilities: ', ndata,'-',number_flagged,'=',ndata_valid
@@ -112,12 +113,11 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global data_vis, data_nbl, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row
+    global data_vis, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row
 
     ####### Read data from MS
-    tab = pt.table(args.ms)
+    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
     data_vis = tab.getcol(args.col)
-    tab.close()
 
     # Create baseline noise array ------------------------
 
@@ -127,19 +127,24 @@ def main(args):
     data_nbl = int((nant*(nant-1))/2)
     anttab.close()
  
-    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: exclude autocorrs
+    data_timearr = np.unique(tab.getcol('TIME'))
+    data_ntime = data_timearr.shape[0]
     data_inttime = tab.getcol('EXPOSURE', 0, data_nbl) # jan26, for VLBA sims
 
-    #get channel width
+    # get channel width
     freqtab = pt.table(args.ms+'/SPECTRAL_WINDOW')
     data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
     data_nchan = freqtab.getcol('NUM_CHAN')[0]
     freqtab.close();
 
-    #get flags from MS
+    # get flags from MS
     data_flag = tab.getcol('FLAG')
     data_flag_row = tab.getcol('FLAG_ROW')
     data_flag = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
+
+    # Set up arrays necessary for predict_vis
+    data_ant1 = tab.getcol('ANTENNA1')
+    data_ant1 = tab.getcol('ANTENNA1')
 
     tab.close()
 
