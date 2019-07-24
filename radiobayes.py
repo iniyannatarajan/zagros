@@ -13,10 +13,10 @@ from africanus.rime.cuda import phase_delay, predict_vis
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
+data_nant=None
 data_nbl=None
-data_timearr=None
-data_ntime=None
 data_inttime=None
+data_uniqtime_index=None
 data_nchan=None
 data_chanwidth=None
 data_flag=None
@@ -24,15 +24,16 @@ data_flag_row=None
 data_ant1=None
 data_ant2=None
 
-# Global variables to be computed
+# Global variables to be computed / used for bookkeeping
+init_loglike=False # To initialise the loglike function
+ndata_unflgged=None
 baselinenoise = None
+weight_vector=None
 
-#other global vars that will be set through command-line
+# Other global vars that will be set through command-line
 hypo=None
 npsrc=None
 ngsrc=None
-ndata_valid=None
-
 
 def create_parser():
     p = argparse.ArgumentParser()
@@ -60,28 +61,29 @@ def loglike(theta):
     Compute the loglikelihood function
     """
 
-    # Find total number of visibilities
-    ndata = 8*data_ntime*data_nbl*data_nchan # 8 because each polarisation has two real numbers (real & imaginary)
-    flag_ll = np.logical_not(data_flag[:,0,0])
-    number_flagged = np.where(flag_ll == False)[0].shape[0] * 8
-    ndata_valid = ndata - number_flagged
-    print 'Number of valid visibilities: ', ndata,'-',number_flagged,'=',ndata_valid
+    if init_loglike == False:
 
-    # Set visibility weights
-    if use_weight_vector:
-        weight_vector=np.zeros(ndata/2).astype(slvr.ft)\
-            .reshape(slvr.weight_vector_shape) # ndata/2.0 because each vis. is (real+i*imag); so now, the array has ntime*nbl*nchan*4 elem. 
-        baselinenoise = np.zeros((slvr.nbl))
-        basecount = 0;
-        for i in np.arange(slvr.na):
-          for j in np.arange(i+1,slvr.na):
-            sefd = np.sqrt(sefdlist[i]*sefdlist[j]);
-            #baselinenoise[basecount] = sefd/math.sqrt(chanwid*dt_val[basecount]) #INI:Removed the sq(2) from the denom. It's for 2 pols.
-            baselinenoise[basecount] = sefd/math.sqrt(2*chanwid*dt_val[basecount]) #INI:ADDED the sq(2) bcoz MeqS uses this convention
-            basecount += 1;
+        # Find total number of visibilities
+        ndata = data_vis.shape[0]*data_vis.shape[1]*data_vis.shape[2]*2 # 8 because each polarisation has two real numbers (real & imaginary)
+        flag_ll = np.logical_not(data_flag[:,0,0])
+        ndata_flagged = np.where(flag_ll == False)[0].shape[0] * 8
+        ndata_unflagged = ndata - ndata_flagged
+        print 'Number of unflagged visibilities: ', ndata, '-', ndata_flagged, '=', ndata_unflagged
 
-        for ibl in np.arange(slvr.nbl):
-            weight_vector[:,:,ibl,:] = 1.0 / (baselinenoise[ibl]*baselinenoise[ibl])
+        # Set visibility weights
+        if use_weight_vector:
+            weight_vector=np.zeros(ndata/2) # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
+            baselinenoise = np.zeros((data_nbl))
+            basecount = 0;
+            for i in np.arange(data_nant):
+              for j in np.arange(i+1,data_nant):
+                sefd = np.sqrt(sefdlist[i]*sefdlist[j]);
+                #baselinenoise[basecount] = sefd/math.sqrt(data_chanwidth*data_inttime[basecount]) #INI:Removed the sq(2) from the denom. It's for 2 pols.
+                baselinenoise[basecount] = sefd/math.sqrt(2*data_chanwidth*chanwid*data_inttime[basecount]) #INI:ADDED the sq(2) bcoz MeqS uses this convention
+                basecount += 1;
+
+            for ibl in np.arange(data_nbl):
+                weight_vector[:,:,ibl,:] = 1.0 / (baselinenoise[ibl]*baselinenoise[ibl])
 
 
 
@@ -113,7 +115,7 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global data_vis, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row
+    global data_vis, dta_nant, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2
 
     ####### Read data from MS
     tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
@@ -123,11 +125,11 @@ def main(args):
 
     anttab = pt.table(args.ms+'/ANTENNA')
     stations = anttab.getcol('STATION')
-    nant = len(stations)
-    data_nbl = int((nant*(nant-1))/2)
+    data_nant = len(stations)
+    data_nbl = int((data_nant*(data_nant-1))/2)
     anttab.close()
  
-    data_timearr = np.unique(tab.getcol('TIME'))
+    _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True) # INI: Obtain the indices of all the unique times
     data_ntime = data_timearr.shape[0]
     data_inttime = tab.getcol('EXPOSURE', 0, data_nbl) # jan26, for VLBA sims
 

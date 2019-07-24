@@ -48,7 +48,7 @@ seed=42
 Smin=0; Smax=2 # Jy
 #delaymin=-200.0*1e-12; delaymax=200e-12; # in seconds; the actual delays
 dxmin=-50; dxmax= 50; # uas
-dymin=-10; dymax= -110; # uas
+dymin=-50; dymax= 50; # uas
 #e1min = 0e-5 * arcsec2rad; e1max = 4e-5 * arcsec2rad;
 #e2min = -4e-5 * arcsec2rad; e2max = 4e-5 * arcsec2rad;
 
