@@ -13,27 +13,32 @@ from africanus.rime.cuda import phase_delay, predict_vis
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
-data_nant=None
-data_nbl=None
-data_inttime=None
-data_uniqtime_index=None
-data_nchan=None
-data_chanwidth=None
-data_flag=None
-data_flag_row=None
-data_ant1=None
-data_ant2=None
+data_nant = None
+data_nbl = None
+data_inttime = None
+data_uniqtime_index = None
+data_nchan = None
+data_chanwidth = None
+data_flag = None
+data_flag_row = None
+data_ant1 = None
+data_ant2 = None
 
 # Global variables to be computed / used for bookkeeping
-init_loglike=False # To initialise the loglike function
-ndata_unflgged=None
-baselinenoise = None
-weight_vector=None
+baseline_dict = None # Constructed in main()
+init_loglike = False # To initialise the loglike function
+ndata_unflgged = None
+per_bl_sig = None
+weight_vector = None
 
 # Other global vars that will be set through command-line
-hypo=None
-npsrc=None
-ngsrc=None
+hypo = None
+npsrc = None
+ngsrc = None
+
+# INI: Flicked from MeqSilhouette
+def make_baseline_dictionary(ant_unique):
+    return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
 def create_parser():
     p = argparse.ArgumentParser()
@@ -61,31 +66,31 @@ def loglike(theta):
     Compute the loglikelihood function
     """
 
+    global init_loglike
+
     if init_loglike == False:
 
         # Find total number of visibilities
         ndata = data_vis.shape[0]*data_vis.shape[1]*data_vis.shape[2]*2 # 8 because each polarisation has two real numbers (real & imaginary)
         flag_ll = np.logical_not(data_flag[:,0,0])
-        ndata_flagged = np.where(flag_ll == False)[0].shape[0] * 8
-        ndata_unflagged = ndata - ndata_flagged
-        print 'Number of unflagged visibilities: ', ndata, '-', ndata_flagged, '=', ndata_unflagged
+        #ndata_flagged = np.where(flag_ll == False)[0].shape[0] * 8
+        ndata_unflagged = ndata - np.where(flag_ll == False)[0].shape[0] * 8
+        print ('Percentage of unflagged visibilities: ', ndata_unflagged, '/', ndata, '=', ndata_unflagged/ndata)
 
         # Set visibility weights
-        if use_weight_vector:
-            weight_vector=np.zeros(ndata/2) # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
-            baselinenoise = np.zeros((data_nbl))
-            basecount = 0;
-            for i in np.arange(data_nant):
-              for j in np.arange(i+1,data_nant):
-                sefd = np.sqrt(sefdlist[i]*sefdlist[j]);
-                #baselinenoise[basecount] = sefd/math.sqrt(data_chanwidth*data_inttime[basecount]) #INI:Removed the sq(2) from the denom. It's for 2 pols.
-                baselinenoise[basecount] = sefd/math.sqrt(2*data_chanwidth*chanwid*data_inttime[basecount]) #INI:ADDED the sq(2) bcoz MeqS uses this convention
-                basecount += 1;
+        if compute_weight_vector:
+            weight_vector=np.zeros(data_vis.shape, dtype='float') # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
+            per_bl_sig = np.zeros((data_nbl))
+            bl_incr = 0;
+            for a1 in np.arange(data_nant):
+              for a2 in np.arange(a1+1,data_nant):
+                #per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(data_chanwidth*data_inttime[bl_incr])) # INI: Removed the sq(2) from the denom. It's for 2 pols.
+                per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
+                weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr],2)
+                bl_incr += 1;
 
-            for ibl in np.arange(data_nbl):
-                weight_vector[:,:,ibl,:] = 1.0 / (baselinenoise[ibl]*baselinenoise[ibl])
-
-
+        weight_vector = cp.array(weight_vector)
+        init_loglike = True # loglike initialised
 
     return loglike, []
 
@@ -115,7 +120,7 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global data_vis, dta_nant, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2
+    global data_vis, data_nant, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
 
     ####### Read data from MS
     tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
@@ -130,7 +135,6 @@ def main(args):
     anttab.close()
  
     _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True) # INI: Obtain the indices of all the unique times
-    data_ntime = data_timearr.shape[0]
     data_inttime = tab.getcol('EXPOSURE', 0, data_nbl) # jan26, for VLBA sims
 
     # get channel width
@@ -146,9 +150,17 @@ def main(args):
 
     # Set up arrays necessary for predict_vis
     data_ant1 = tab.getcol('ANTENNA1')
-    data_ant1 = tab.getcol('ANTENNA1')
+    data_ant2 = tab.getcol('ANTENNA2')
+    ant_unique = np.unique(np.hstack((data_ant1, data_ant2)))
+    baseline_dict = make_baseline_dictionary(ant_unique)
 
     tab.close()
+
+    # Move necessary arrays to cupy from numpy
+    data_vis = cp.array(data_vis)
+    data_ant1 = cp.array(data_ant1)
+    data_ant2 = cp.array(data_ant2)
+    data_uniqtime_index = cp.array(data_uniqtime_index)
 
     # Set up pypolychord
     settings = PolyChordSettings(args.npar, 0)
