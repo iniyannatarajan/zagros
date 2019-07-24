@@ -10,19 +10,24 @@ import pyrap.tables as pt
 from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
+from africanus.coordinates import radec_to_lm
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
-data_nant = None
-data_nbl = None
-data_inttime = None
-data_uniqtime_index = None
-data_nchan = None
-data_chanwidth = None
-data_flag = None
-data_flag_row = None
+data_uvw = None
 data_ant1 = None
 data_ant2 = None
+data_inttime = None
+data_flag = None
+data_flag_row = None
+
+data_nant = None
+data_nbl = None
+data_uniqtime_index = None
+
+data_nchan = None
+data_chanwidth = None
+data_chan_freq=None # Frequency of each channel. NOTE: Can handle only one SPW.
 
 # Global variables to be computed / used for bookkeeping
 baseline_dict = None # Constructed in main()
@@ -35,10 +40,6 @@ weight_vector = None
 hypo = None
 npsrc = None
 ngsrc = None
-
-# INI: Flicked from MeqSilhouette
-def make_baseline_dictionary(ant_unique):
-    return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
 def create_parser():
     p = argparse.ArgumentParser()
@@ -53,7 +54,6 @@ def create_parser():
     p.add_argument('--npar', type=int, required=True)
     p.add_argument('--basedir', type=str, required=True)
     p.add_argument('--fileroot', type=str, required=True)
-
     return p
 
 def pol_to_rec(amp, phase):
@@ -61,9 +61,68 @@ def pol_to_rec(amp, phase):
     im = amp*np.sin(phase*np.pi/180.0)
     return re, im
 
+# INI: Flicked from MeqSilhouette
+def make_baseline_dictionary(ant_unique):
+    return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
+
+# INI: From Simon's predict.py example
+def corr_schema():
+    """
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    corr_schema : list of list
+        correlation schema from the POLARIZATION table,
+        `[[9, 10], [11, 12]]` for example
+    """
+
+    corrs = pol.NUM_CORR.values
+    corr_types = pol.CORR_TYPE.values
+
+    if corrs == 4:
+        return [[corr_types[0], corr_types[1]],
+                [corr_types[2], corr_types[3]]]  # (2, 2) shape
+    elif corrs == 2:
+        return [corr_types[0], corr_types[1]]    # (2, ) shape
+    elif corrs == 1:
+        return [corr_types[0]]                   # (1, ) shape
+    else:
+        raise ValueError("corrs %d not in (1, 2, 4)" % corrs)
+
+def einsum_schema():
+    """
+    Returns an einsum schema suitable for multiplying per-baseline
+    phase and brightness terms.
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    einsum_schema : str
+    """
+    corrs = data_vis.shape[2]
+
+    if corrs == 4:
+        return "srf, sij -> srfij"
+    elif corrs in (2, 1):
+        return "srf, si -> srfi"
+    else:
+        raise ValueError("corrs %d not in (1, 2, 4)" % corrs)
+
 def loglike(theta):
     """
     Compute the loglikelihood function
+    Parameters
+    ----------
+    theta : Input parameter vector
+
+    Returns
+    -------
+    loglike : float
     """
 
     global init_loglike
@@ -75,7 +134,7 @@ def loglike(theta):
         flag_ll = np.logical_not(data_flag[:,0,0])
         #ndata_flagged = np.where(flag_ll == False)[0].shape[0] * 8
         ndata_unflagged = ndata - np.where(flag_ll == False)[0].shape[0] * 8
-        print ('Percentage of unflagged visibilities: ', ndata_unflagged, '/', ndata, '=', ndata_unflagged/ndata)
+        print ('Percentage of unflagged visibilities: ', ndata_unflagged, '/', ndata, '=', (ndata_unflagged/ndata)*100)
 
         # Set visibility weights
         if compute_weight_vector:
@@ -91,6 +150,19 @@ def loglike(theta):
 
         weight_vector = cp.array(weight_vector)
         init_loglike = True # loglike initialised
+
+    # Set up arrays to be passed to predict_vis()
+    lm = cp.array([[theta[1], theta[2]]])
+    print(lm, type(lm))
+
+    phase = phase_delay(lm, data_uvw, data_chan_freq)
+    brightness =  None
+    source_coh_matrix =  np.einsum(einsum_schema(), phase, brightness)
+
+    # Predict (forward model) visibilities
+    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, None, source_coh_matrix, None, None, None, None)
+
+    # Compute chi-squared and loglikelihood
 
     return loglike, []
 
@@ -120,47 +192,58 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global data_vis, data_nant, data_nbl, data_timearr, data_ntime, data_inttime, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
+    global hypo, npsrc, ngsrc, data_vis, data_uvw, data_nant, data_nbl, data_timearr, data_ntime, data_inttime, \
+            data_chan_freq, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
+
+    # Set command line parameters
+    hypo = args.hypo
+    npsrc = args.npsrc
+    ngsrc = args.ngsrc
 
     ####### Read data from MS
     tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
     data_vis = tab.getcol(args.col)
-
-    # Create baseline noise array ------------------------
-
-    anttab = pt.table(args.ms+'/ANTENNA')
-    stations = anttab.getcol('STATION')
-    data_nant = len(stations)
-    data_nbl = int((data_nant*(data_nant-1))/2)
-    anttab.close()
- 
-    _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True) # INI: Obtain the indices of all the unique times
-    data_inttime = tab.getcol('EXPOSURE', 0, data_nbl) # jan26, for VLBA sims
-
-    # get channel width
-    freqtab = pt.table(args.ms+'/SPECTRAL_WINDOW')
-    data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
-    data_nchan = freqtab.getcol('NUM_CHAN')[0]
-    freqtab.close();
-
-    # get flags from MS
-    data_flag = tab.getcol('FLAG')
-    data_flag_row = tab.getcol('FLAG_ROW')
-    data_flag = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
-
-    # Set up arrays necessary for predict_vis
     data_ant1 = tab.getcol('ANTENNA1')
     data_ant2 = tab.getcol('ANTENNA2')
     ant_unique = np.unique(np.hstack((data_ant1, data_ant2)))
     baseline_dict = make_baseline_dictionary(ant_unique)
 
+    # Read uvw coordinates; nececssary for computing the source coherency matrix
+    data_uvw = tab.getcol('UVW')
+    if args.invert_uvw: data_uvw = -data_uvw # Invert uvw coordinates for comparison with MeqTrees
+
+    # get data from ANTENNA subtable
+    anttab = pt.table(args.ms+'/ANTENNA')
+    stations = anttab.getcol('STATION')
+    data_nant = len(stations)
+    data_nbl = int((data_nant*(data_nant-1))/2)
+    anttab.close()
+
+    # Obtain indices of unique times in 'TIME' column
+    _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True)
+    data_inttime = tab.getcol('EXPOSURE', 0, data_nbl)
+
+    # Get flag info from MS
+    data_flag = tab.getcol('FLAG')
+    data_flag_row = tab.getcol('FLAG_ROW')
+    data_flag = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
+
     tab.close()
+
+    # get frequency info from SPECTRAL_WINDOW subtable
+    freqtab = pt.table(args.ms+'/SPECTRAL_WINDOW')
+    data_chan_freq = freqtab.getcol('CHAN_FREQ')[0]
+    data_nchan = freqtab.getcol('NUM_CHAN')[0]
+    data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
+    freqtab.close();
 
     # Move necessary arrays to cupy from numpy
     data_vis = cp.array(data_vis)
     data_ant1 = cp.array(data_ant1)
     data_ant2 = cp.array(data_ant2)
+    data_uvw = cp.array(data_uvw)
     data_uniqtime_index = cp.array(data_uniqtime_index)
+    data_chan_freq = cp.array(data_chan_freq)
 
     # Set up pypolychord
     settings = PolyChordSettings(args.npar, 0)
@@ -173,8 +256,7 @@ def main(args):
     settings.read_resume = False
     settings.seed = seed    
 
-    #ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)
-    loglike(0)
+    ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)
 
     return 0
 
