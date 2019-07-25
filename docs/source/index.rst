@@ -11,11 +11,6 @@ RadioBayes documentation
    :caption: Contents:
 
    readme
-   installation
-   usage
-   api
-   contributors
-   history
 
 Indices and tables
 ==================
