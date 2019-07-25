@@ -47,8 +47,8 @@ seed=42
 # for uniform priors
 Smin=0; Smax=2 # Jy
 #delaymin=-200.0*1e-12; delaymax=200e-12; # in seconds; the actual delays
-dxmin=-50; dxmax= 50; # uas
-dymin=-50; dymax= 50; # uas
+dxmin=-50*uas2rad; dxmax= 50*uas2rad; # uas
+dymin=-50*uas2rad; dymax= 50*uas2rad; # uas
 #e1min = 0e-5 * arcsec2rad; e1max = 4e-5 * arcsec2rad;
 #e2min = -4e-5 * arcsec2rad; e2max = 4e-5 * arcsec2rad;
 

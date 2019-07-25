@@ -156,8 +156,6 @@ def loglike(theta):
     lm = cp.array([[theta[1], theta[2]]])
     phase = phase_delay(lm, data_uvw, data_chan_freq)
 
-    print(phase)
-
     # Set up the brightness matrix
     stokes = cp.array([[theta[0], 0, 0, 0]])
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
@@ -204,7 +202,7 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global hypo, npsrc, ngsrc, data_vis, data_uvw, data_nant, data_nbl, data_timearr, data_ntime, data_inttime, \
+    global hypo, npsrc, ngsrc, data_vis, data_uvw, data_nant, data_nbl, data_uniqtime_index, data_ntime, data_inttime, \
             data_chan_freq, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
 
     # Set command line parameters
