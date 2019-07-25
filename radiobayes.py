@@ -172,10 +172,11 @@ def loglike(theta):
     # Predict (forward model) visibilities
     model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, None, source_coh_matrix, None, None, None, None)
 
-    # Compute chi-squared and loglikelihood
+    # Compute chi-squared and loglikelihood - yet to be verified
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
     chi2 = cp.sum((diff.real*diff.real+diff.imag*diff.imag) * weight_vector)
-    loglike = cp.float(-chi2/2.0-ndata_unflagged*0.5*cp.log(2.0*cp.pi*sigmaSim**2.0))
+    #loglike = cp.float(-chi2/2.0 - ndata_unflagged*cp.log(2.0*cp.pi*sigmaSim**2.0)) # INI: Factor of 0.5 in the second term required to account for real&imag? VERIFY.
+    loglike = cp.float(-chi2/2.0 - cp.log(2*cp.pi*(1.0/weight_vector.flatten()[cp.nonzero(weight_vector.flatten())])).sum())
 
     return loglike, []
 
