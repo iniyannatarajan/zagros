@@ -10,9 +10,7 @@ RadioBayes documentation
    :maxdepth: 2
    :caption: Contents:
 
-Installation
-============
-   readme
+   radiobayes
 
 Indices and tables
 ==================
