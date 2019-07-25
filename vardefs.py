@@ -27,9 +27,9 @@ sqrtTwo=sqrt(2.0)
 #------------------------------------------------------------------------------
 # Variables for assigning weights to visibilities
 
-sigmaSim=None #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
-compute_weight_vector=True
-sefds=np.array([6000,1300,560,220,2000,1600,5000,1600,4500]) # station SEFDs in Jy - from EHT2017_station_info
+sigmaSim=0.1 #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
+compute_weight_vector=False
+#sefds=np.array([6000,1300,560,220,2000,1600,5000,1600,4500]) # station SEFDs in Jy - from EHT2017_station_info
 
 
 # Codex-africanus settings

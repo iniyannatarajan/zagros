@@ -66,7 +66,6 @@ def pol_to_rec(amp, phase):
 def make_baseline_dictionary(ant_unique):
     return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
-# INI: From Simon's predict.py example
 def corr_schema():
     """
     Parameters
@@ -126,7 +125,7 @@ def loglike(theta):
     loglike : float
     """
 
-    global init_loglike
+    global init_loglike, ndata_unflagged, per_bl_sig, weight_vector
 
     if init_loglike == False:
 
@@ -149,25 +148,33 @@ def loglike(theta):
                 weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr], 2)
                 bl_incr += 1;
 
-        weight_vector = cp.array(weight_vector)
-        init_loglike = True # loglike initialised
+            weight_vector = cp.array(weight_vector)
+        init_loglike = True # loglike initialised; will not enter on subsequent iterations
 
     # Set up arrays necessary for forward modelling
     # Set up the phase delay matrix
     lm = cp.array([[theta[1], theta[2]]])
     phase = phase_delay(lm, data_uvw, data_chan_freq)
 
-    # 2. Set up the brightness matrix
-    stokes = cp.stack([theta[0], 0, 0, 0], axis=1)
+    print(phase)
+
+    # Set up the brightness matrix
+    stokes = cp.array([[theta[0], 0, 0, 0]])
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
+    # Compute einsum schema
+    einschema = einsum_schema()
+
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
-    source_coh_matrix =  np.einsum(einsum_schema(), phase, brightness)
+    source_coh_matrix =  cp.einsum(einschema, phase, brightness)
 
     # Predict (forward model) visibilities
     model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, None, source_coh_matrix, None, None, None, None)
 
     # Compute chi-squared and loglikelihood
+    diff = model_vis - data_vis
+    chi2 = (diff.real()*diff.real() + diff.imag()*diff.imag()) * weight_vector
+    loglike = -chi2/2.0-ndata_unflagged*0.5*cp.log(2.0*cp.pi*sigmaSim**2.0)
 
     return loglike, []
 
