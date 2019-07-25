@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 
 # -- Project information -----------------------------------------------------
 
-project = u'radiobayes'
+project = u'RadioBayes'
 copyright = u'2019, Iniyan Natarajan'
 author = u'Iniyan Natarajan'
 
