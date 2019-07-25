@@ -125,20 +125,19 @@ def loglike(theta):
     loglike : float
     """
 
-    global init_loglike, ndata_unflagged, per_bl_sig, weight_vector
+    global init_loglike, ndata_unflagged, per_bl_sig, weight_vector, data_vis
 
     if init_loglike == False:
 
         # Find total number of visibilities
         ndata = data_vis.shape[0]*data_vis.shape[1]*data_vis.shape[2]*2 # 8 because each polarisation has two real numbers (real & imaginary)
         flag_ll = np.logical_not(data_flag[:,0,0])
-        #ndata_flagged = np.where(flag_ll == False)[0].shape[0] * 8
         ndata_unflagged = ndata - np.where(flag_ll == False)[0].shape[0] * 8
         print ('Percentage of unflagged visibilities: ', ndata_unflagged, '/', ndata, '=', (ndata_unflagged/ndata)*100)
 
         # Set visibility weights
-        if compute_weight_vector:
-            weight_vector=np.zeros(data_vis.shape, dtype='float') # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
+        weight_vector=np.zeros(data_vis.shape, dtype='float') # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
+        if not sigmaSim:
             per_bl_sig = np.zeros((data_nbl))
             bl_incr = 0;
             for a1 in np.arange(data_nant):
@@ -147,8 +146,12 @@ def loglike(theta):
                 per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
                 weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr], 2)
                 bl_incr += 1;
+        else:
+            weight_vector[:] = 1.0 /np.power(sigmaSim, 2)
 
-            weight_vector = cp.array(weight_vector)
+        weight_vector *= np.logical_not(data_flag)
+        weight_vector = cp.array(weight_vector.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2)))
+
         init_loglike = True # loglike initialised; will not enter on subsequent iterations
 
     # Set up arrays necessary for forward modelling
@@ -170,9 +173,9 @@ def loglike(theta):
     model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, None, source_coh_matrix, None, None, None, None)
 
     # Compute chi-squared and loglikelihood
-    diff = model_vis - data_vis
-    chi2 = (diff.real()*diff.real() + diff.imag()*diff.imag()) * weight_vector
-    loglike = -chi2/2.0-ndata_unflagged*0.5*cp.log(2.0*cp.pi*sigmaSim**2.0)
+    diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
+    chi2 = cp.sum((diff.real*diff.real+diff.imag*diff.imag) * weight_vector)
+    loglike = cp.float(-chi2/2.0-ndata_unflagged*0.5*cp.log(2.0*cp.pi*sigmaSim**2.0))
 
     return loglike, []
 
@@ -252,7 +255,7 @@ def main(args):
     data_ant1 = cp.array(data_ant1)
     data_ant2 = cp.array(data_ant2)
     data_uvw = cp.array(data_uvw)
-    data_uniqtime_index = cp.array(data_uniqtime_index)
+    data_uniqtime_index = cp.array(data_uniqtime_index, dtype=cp.int32)
     data_chan_freq = cp.array(data_chan_freq)
 
     # Set up pypolychord
