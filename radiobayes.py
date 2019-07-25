@@ -11,6 +11,7 @@ from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
 from africanus.coordinates import radec_to_lm
+from africanus.model.coherency.cuda import convert
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
@@ -145,18 +146,22 @@ def loglike(theta):
               for a2 in np.arange(a1+1,data_nant):
                 #per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(data_chanwidth*data_inttime[bl_incr])) # INI: Removed the sq(2) from the denom. It's for 2 pols.
                 per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
-                weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr],2)
+                weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr], 2)
                 bl_incr += 1;
 
         weight_vector = cp.array(weight_vector)
         init_loglike = True # loglike initialised
 
-    # Set up arrays to be passed to predict_vis()
+    # Set up arrays necessary for forward modelling
+    # Set up the phase delay matrix
     lm = cp.array([[theta[1], theta[2]]])
-    print(lm, type(lm))
-
     phase = phase_delay(lm, data_uvw, data_chan_freq)
-    brightness =  None
+
+    # 2. Set up the brightness matrix
+    stokes = cp.stack([theta[0], 0, 0, 0], axis=1)
+    brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
+
+    # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
     source_coh_matrix =  np.einsum(einsum_schema(), phase, brightness)
 
     # Predict (forward model) visibilities
