@@ -11,6 +11,7 @@ Zagros documentation
    :caption: Contents:
 
    readme
+   requirements
    usage
    history
 
