@@ -1,5 +1,5 @@
 """
-Settings file for radiobayes.py. Import this in radiobayes.py to access the variables.
+Settings file for zagros.py. Import this in zagros.py to access the variables.
 """
 
 import time
