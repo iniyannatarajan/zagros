@@ -1,10 +1,10 @@
-============
-RadioBayes
-============
+======
+Zagros
+======
 
-Perform Bayesian statistical analysis of radio interferometry data.
+Zagros is an Application for Gauging Radio Observation Statistics
 
 Documentation
 -------------
 
-https://radiobayes.readthedocs.io
+https://zagros.readthedocs.io
