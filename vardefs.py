@@ -7,11 +7,13 @@ import os
 import sys
 import scipy.constants as sc
 import pyrap.tables as pt
-import pypolychord as ppc
-from pypolychord.settings import PolyChordSettings
+#import pypolychord as ppc
+#from pypolychord.settings import PolyChordSettings
+from mpi4py import MPI
+import dyPolyChord.pypolychord_utils
+import dyPolyChord
 import numpy as np
 import cupy as cp
-#from mpi4py import MPI
 from math import sqrt
 import logging
 
@@ -33,10 +35,11 @@ sigmaSim=0.1 #Error on each visibility that goes into the predictions - should b
 
 # Codex-africanus settings
 
-# pypolychord settings
-nlive=375 # Number of live points for ppc
-num_repeats = 30 # Recommended (not less than 2*nDims)
-evtol=0.5 # Evidence tolerance for ppc
+# dyPolyChord settings
+nlive=300 # Number of live points for dpc
+nlive_init=50
+#num_repeats = 30 # Recommended (not less than 2*nDims)
+#evtol=0.5 # Evidence tolerance for ppc
 seed=42
 
 #-------------------------------------------------------------------------------

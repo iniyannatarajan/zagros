@@ -259,7 +259,7 @@ def main(args):
     data_uniqtime_index = cp.array(data_uniqtime_index, dtype=cp.int32)
     data_chan_freq = cp.array(data_chan_freq)
 
-    # Set up pypolychord
+    '''# Set up pypolychord
     settings = PolyChordSettings(args.npar, 0)
     settings.base_dir = args.basedir
     settings.file_root = args.fileroot
@@ -270,7 +270,22 @@ def main(args):
     settings.read_resume = False
     settings.seed = seed    
 
-    ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)
+    ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)'''
+
+    # Make a callable for running PolyChord
+    my_callable = dyPolyChord.pypolychord_utils.RunPyPolyChord(loglike, prior_transform, args.npar)
+
+    dynamic_goal = 1.0  # whether to maximise parameter estimation or evidence accuracy.
+    ninit = nlive_init          # number of live points to use in initial exploratory run.
+    nlive_const = nlive   # total computational budget is the same as standard nested sampling with nlive_const live points.
+    settings_dict = {'file_root': args.fileroot,
+                     'base_dir': args.basedir,
+                     'seed': seed}
+    
+    comm = MPI.COMM_WORLD
+
+    # Run dyPolyChord
+    dyPolyChord.run_dypolychord(my_callable, dynamic_goal, settings_dict, ninit=ninit, nlive_const=nlive_const, comm=comm)
 
     return 0
 
