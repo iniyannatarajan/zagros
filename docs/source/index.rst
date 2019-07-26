@@ -11,6 +11,7 @@ Zagros documentation
    :caption: Contents:
 
    readme
+   usage
    history
 
 Indices and tables

@@ -1,8 +1,8 @@
 ======
-ZAGROS
+Zagros
 ======
 
-ZAGROS is an **A**\ pplication for **G**\ auging **R**\ adio **O**\ bservation **S**\ tatistics
+**Z**\ agros is an **A**\ pplication for **G**\ auging **R**\ adio **O**\ bservation **S**\ tatistics
 
 Documentation
 -------------
