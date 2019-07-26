@@ -1,8 +1,8 @@
 ======
-Zagros
+ZAGROS
 ======
 
-Zagros is an Application for Gauging Radio Observation Statistics
+ZAGROS is an **A**\ pplication for **G**\ auging **R**\ adio **O**\ bservation **S**\ tatistics
 
 Documentation
 -------------
