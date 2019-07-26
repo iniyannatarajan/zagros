@@ -15,4 +15,8 @@ Zagros can be run as follows, after modifying the likelihood and prior functions
 * ``<output-dir>`` is the output directory in which dyPolyChord creates the output files
 * ``<outfile-prefix>`` is the prefix that dyPolyChord adds to the output files
 
-.. note:: Currently, zagros can handle only point sources (with Gaussian example soon to be updated) for modelling astronomical sources.
+Currently, zagros can handle only point sources and Gaussian morphologies for modelling astronomical sources.
+
+.. todo:: Update Gaussian example
+
+.. todo:: Update example with antenna gain parameters
