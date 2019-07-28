@@ -13,6 +13,7 @@ Zagros documentation
    readme
    requirements
    usage
+   todo
    history
 
 Indices and tables
