@@ -38,8 +38,10 @@ sigmaSim=0.1 #Error on each visibility that goes into the predictions - should b
 # dyPolyChord settings
 nlive=300 # Number of live points for dpc
 nlive_init=50
+ninit_step=nlive_init*4
 #num_repeats = 30 # Recommended (not less than 2*nDims)
 #evtol=0.5 # Evidence tolerance for ppc
+dynamic_goal=1.0
 seed=42
 
 #-------------------------------------------------------------------------------

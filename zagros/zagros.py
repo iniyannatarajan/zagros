@@ -275,9 +275,6 @@ def main(args):
     # Make a callable for running PolyChord
     my_callable = dyPolyChord.pypolychord_utils.RunPyPolyChord(loglike, prior_transform, args.npar)
 
-    dynamic_goal = 1.0  # whether to maximise parameter estimation or evidence accuracy.
-    ninit = nlive_init          # number of live points to use in initial exploratory run.
-    nlive_const = nlive   # total computational budget is the same as standard nested sampling with nlive_const live points.
     settings_dict = {'file_root': args.fileroot,
                      'base_dir': args.basedir,
                      'seed': seed}
@@ -285,7 +282,7 @@ def main(args):
     comm = MPI.COMM_WORLD
 
     # Run dyPolyChord
-    dyPolyChord.run_dypolychord(my_callable, dynamic_goal, settings_dict, ninit=ninit, nlive_const=nlive_const, comm=comm)
+    dyPolyChord.run_dypolychord(my_callable, dynamic_goal, settings_dict, ninit=nlive_init, ninit_step=ninit_step, nlive_const=nlive, comm=comm)
 
     return 0
 
