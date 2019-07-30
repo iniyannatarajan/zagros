@@ -36,6 +36,7 @@ init_loglike = False # To initialise the loglike function
 ndata_unflgged = None
 per_bl_sig = None
 weight_vector = None
+einschema = None
 
 # Other global vars that will be set through command-line
 hypo = None
@@ -128,7 +129,7 @@ def loglike(theta):
     loglike : float
     """
 
-    global init_loglike, ndata_unflagged, per_bl_sig, weight_vector, data_vis
+    global init_loglike, ndata_unflagged, per_bl_sig, weight_vector, data_vis, einschema
 
     if init_loglike == False:
 
@@ -155,6 +156,9 @@ def loglike(theta):
         weight_vector *= np.logical_not(data_flag)
         weight_vector = cp.array(weight_vector.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2)))
 
+        # Compute einsum schema
+        einschema = einsum_schema()
+
         init_loglike = True # loglike initialised; will not enter on subsequent iterations
 
     # Set up arrays necessary for forward modelling
@@ -166,8 +170,9 @@ def loglike(theta):
     stokes = cp.array([[theta[0], 0, 0, 0]])
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
-    # Compute einsum schema
-    einschema = einsum_schema()
+    # Set up the G-Jones matrices
+    die1_jones = cp.array((data_uniqtime_index.shape[0], data_ant1.shape[0], data_nchan, 2, 2))
+    die2_jones = cp.array((data_uniqtime_index.shape[0], data_ant1.shape[0], data_nchan, 2, 2))
 
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
     source_coh_matrix =  cp.einsum(einschema, phase, brightness)
