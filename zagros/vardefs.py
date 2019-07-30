@@ -58,4 +58,4 @@ dymin=-50*uas2rad; dymax= 50*uas2rad; # uas
 #for Gaussian priors
 #Smu=0.149124;Ssigma=1e-4;
 
-#refchan_delay=0 # index (in the MS spw table) of reference channel for delays
+refchan_delay=0 # index (in the MS spw table) of reference channel for delays
