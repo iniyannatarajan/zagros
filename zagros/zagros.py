@@ -116,7 +116,9 @@ def einsum_schema():
 
 def loglike(theta):
     """
-    Compute the loglikelihood function
+    Compute the loglikelihood function.
+    NOTE: Not called directly by user code; the function signature must
+          correspond to the requirements of the numerical sampler used.
     Parameters
     ----------
     theta : Input parameter vector
@@ -184,7 +186,17 @@ def loglike(theta):
 pri=None
 def prior_transform(hcube):
     """
-    Transform the unit hypercube into the prior ranges and distributions requested
+    Transform the unit hypercube into the prior ranges and distributions requested (refer to Nested sampling papers).
+    NOTE: Not called directly by user code; the function signature must
+          correspond to the requirements of the numerical sampler used.
+    Parameters
+    ----------
+    hcube: Input hyercube
+
+    Returns
+    -------
+    theta: Sampled parameter vector
+
     """
 
     global pri;
@@ -282,7 +294,7 @@ def main(args):
     comm = MPI.COMM_WORLD
 
     # Run dyPolyChord
-    dyPolyChord.run_dypolychord(my_callable, dynamic_goal, settings_dict, ninit=nlive_init, ninit_step=ninit_step, nlive_const=nlive, comm=comm)
+    dyPolyChord.run_dypolychord(my_callable, dynamic_goal, settings_dict, ninit=nlive_init, nlive_const=nlive, comm=comm)
 
     return 0
 
