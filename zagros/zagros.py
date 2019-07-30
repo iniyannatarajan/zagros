@@ -171,14 +171,19 @@ def loglike(theta):
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
     # Set up the G-Jones matrices
-    die1_jones = cp.array((data_uniqtime_index.shape[0], data_ant1.shape[0], data_nchan, 2, 2))
-    die2_jones = cp.array((data_uniqtime_index.shape[0], data_ant1.shape[0], data_nchan, 2, 2))
+    die_jones = cp.zeros((data_uniqtime_index.shape[0], data_nant, data_nchan, 2, 2))
+    for ant in range(data_nant):
+      for chan in range(data_nchan):
+          delayterm = pcube[ant+3]*(chan-refchan_delay)*chanwid # delayterm in 'turns'; 9th chan (index 8) is the reference frequency.
+          pherr = delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; pec_ph and rate are zero
+          re, im = pol_to_rec(1,pherr)
+          die_jones[:, ant, chan, 0, 0] = die1_jones[:, ant, chan, 1, 1] = re + 1j*im
 
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
     source_coh_matrix =  cp.einsum(einschema, phase, brightness)
 
     # Predict (forward model) visibilities
-    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, None, source_coh_matrix, None, None, None, None)
+    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
@@ -213,6 +218,10 @@ def prior_transform(hcube):
         theta.append(pri.GeneralPrior(hcube[0],'U',Smin,Smax))
         theta.append(pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
         theta.append(pri.GeneralPrior(hcube[2],'U',dymin,dymax))
+        theta.append(pri.GeneralPrior(cube[3],'U',delaymin,delaymax))
+        theta.append(0) # referenced to antenna 2 by default
+        for ant in range(5,5+(data_nant-2)):
+            theta.append(pri.GeneralPrior(cube[ant],'U',delaymin,delaymax))
 
     else:
         print('*** WARNING: Illegal hypothesis')
