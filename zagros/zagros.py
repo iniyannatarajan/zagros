@@ -11,7 +11,8 @@ from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
 from africanus.coordinates import radec_to_lm
-from africanus.model.coherency.cuda import convert
+from africanus.model.coherency.cuda import convert # convert between correlations and Stokes parameters
+from africanus.model.shape.dask import gaussian as gaussian_shape
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
@@ -171,12 +172,12 @@ def loglike(theta):
     stokes = cp.array([[theta[0], 0, 0, 0]])
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
+    # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
+    source_coh_matrix =  cp.einsum(einschema, phase, brightness)
+
     ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
     # Set up the G-Jones matrices
     # die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
-
-    # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
-    source_coh_matrix =  cp.einsum(einschema, phase, brightness)
 
     # Predict (forward model) visibilities
     # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
