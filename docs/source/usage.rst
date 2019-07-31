@@ -15,4 +15,10 @@ Zagros can be run as follows, after modifying the likelihood and prior functions
 * ``<output-dir>`` is the output directory in which dyPolyChord creates the output files
 * ``<outfile-prefix>`` is the prefix that dyPolyChord adds to the output files
 
-.. note:: Currently, zagros can handle only point sources and Gaussian morphologies for modelling astronomical sources.
+
+Miscellaneous Notes:
+
+.. note:: This repo is intended to serve as a template. For the analysis of more specific models, a few more scripts or child repos will be added.
+
+.. note:: The DIE and DDE Jones matrices kwargs to predict_vis() corresponding to both ant1 and ant2 must be the same; the Hermitian conjugate will be performed inside africanus;
+          no need for the user to do this externally.

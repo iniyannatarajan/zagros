@@ -2,6 +2,13 @@
 History
 =======
 
+0.1.1 (2019-07-31)
+------------------
+
+* Update example with gain matrices
+* Update documentation
+
+
 0.1.0 (2019-07-26)
 ------------------
 
