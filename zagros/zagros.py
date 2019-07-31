@@ -25,6 +25,7 @@ data_flag_row = None
 data_nant = None
 data_nbl = None
 data_uniqtime_index = None
+data_ntime = None
 
 data_nchan = None
 data_chanwidth = None
@@ -170,20 +171,16 @@ def loglike(theta):
     stokes = cp.array([[theta[0], 0, 0, 0]])
     brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
+    ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
     # Set up the G-Jones matrices
-    die_jones = cp.zeros((data_uniqtime_index.shape[0], data_nant, data_nchan, 2, 2), dtype=cp.complex)
-    for ant in range(data_nant):
-      for chan in range(data_nchan):
-          delayterm = theta[ant+3]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 9th chan (index 8) is the reference frequency.
-          pherr = delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; pec_ph and rate are zero
-          re, im = pol_to_rec(1,pherr)
-          die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im
+    # die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
 
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
     source_coh_matrix =  cp.einsum(einschema, phase, brightness)
 
     # Predict (forward model) visibilities
-    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
+    # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
+    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=None, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=None, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
@@ -261,6 +258,7 @@ def main(args):
 
     # Obtain indices of unique times in 'TIME' column
     _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True)
+    data_ntime = data_uniqtime_index.shape[0]
     data_inttime = tab.getcol('EXPOSURE', 0, data_nbl)
 
     # Get flag info from MS
