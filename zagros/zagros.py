@@ -177,11 +177,17 @@ def loglike(theta):
 
     ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
     # Set up the G-Jones matrices
-    # die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
+    die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
+    for ant in cp.arange(data_nant):
+      for chan in cp.arange(data_nchan):
+          delayterm = theta[ant+3]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 9th chan (index 8) is the reference frequency.
+          pherr = delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; pec_ph and rate are zero
+          re, im = pol_to_rec(1,pherr)
+          die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im
 
     # Predict (forward model) visibilities
     # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
-    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=None, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=None, base_vis=None)
+    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))

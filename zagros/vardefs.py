@@ -49,7 +49,7 @@ seed=42
 
 # for uniform priors
 Smin=0; Smax=2 # Jy
-#delaymin=-200.0*1e-12; delaymax=200e-12; # in seconds; the actual delays
+delaymin=-200.0*1e-12; delaymax=200e-12; # in seconds; the actual delays
 dxmin=-50*uas2rad; dxmax= 50*uas2rad; # uas
 dymin=-50*uas2rad; dymax= 50*uas2rad; # uas
 e1min = 0*uas2rad; e1max = 40*uas2rad;
@@ -58,4 +58,4 @@ e2min = -40*uas2rad; e2max = 40*uas2rad;
 #for Gaussian priors
 #Smu=0.149124;Ssigma=1e-4;
 
-#refchan_delay=0 # index (in the MS spw table) of reference channel for delays
+refchan_delay=0 # index (in the MS spw table) of reference channel for delays
