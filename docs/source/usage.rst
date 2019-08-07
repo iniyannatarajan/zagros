@@ -13,8 +13,29 @@ Zagros can be run as follows, after modifying the likelihood and prior functions
 * ``<output-dir>`` is the output directory in which dyPolyChord creates the output files
 * ``<outfile-prefix>`` is the prefix that dyPolyChord adds to the output files
 
+Setting up the RIME:
+--------------------
+
+The user must define the model parameters and their prior distributions, and build the model data for likelihood computation using the Radio Interferometry Measurement Equation (RIME).
+
+.. math::
+
+    V_{pq} = G_{p} \left(
+        \sum_{s} E_{ps} L_{p} K_{ps}
+        B_{s}
+        K_{qs}^H L_{q}^H E_{qs}^H
+        \right) G_{q}^H
+
+where for antenna :math:`p` and :math:`q`, and source :math:`s`:
+
+- :math:`G_{p}` represents direction-independent effects.
+- :math:`E_{ps}` represents direction-dependent effects.
+- :math:`L_{p}` represents the feed rotation.
+- :math:`K_{ps}` represents the phase delay term.
+- :math:`B_{s}` represents the brightness matrix.
 
 Miscellaneous Notes:
+--------------------
 
 .. note:: This repo is intended to serve as a template. For the analysis of more specific models, a few more scripts or child repos will be added.
 
