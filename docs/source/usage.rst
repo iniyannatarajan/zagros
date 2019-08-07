@@ -13,10 +13,14 @@ Zagros can be run as follows, after modifying the likelihood and prior functions
 * ``<output-dir>`` is the output directory in which dyPolyChord creates the output files
 * ``<outfile-prefix>`` is the prefix that dyPolyChord adds to the output files
 
+The aim is to perform statistical analyses of radio interferometric visibilities, by constructing parameteric models based on physical assumptions and comparing them against the observed data. 
+The user must define the model parameters and construct their priors and the likelihood computation.
+The model construction (during each iteration of the likelihood computation) is facilitated by **codex-africanus** and the numerical sampling of the model parameteres is done by **dyPolyChord**.
+
 Setting up the RIME:
 --------------------
 
-The user must define the model parameters and their prior distributions, and build the model data for likelihood computation using the Radio Interferometry Measurement Equation (RIME).
+The Radio Interferometry Measurement Equation (RIME) is given by
 
 .. math::
 
