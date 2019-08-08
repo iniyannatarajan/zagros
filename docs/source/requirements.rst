@@ -2,6 +2,11 @@
 Requirements & Installation
 ===========================
 
+Requirements:
+-------------
+
+.. note:: Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
+
 Zagros requires that the following python packages are installed:
 
    * `codex-africanus <https://github.com/ska-sa/codex-africanus>`_
@@ -10,12 +15,10 @@ Zagros requires that the following python packages are installed:
 
 .. note:: dyPolyChord requires the installation of the C++ library PolyChord and the corresponding python wrapper pypolychord. Both are included in PolyChordLite.
 
-Quick installation instructions:
---------------------------------
+Installation:
+-------------
 
 The following instructions should set up the environment required for running Zagros. Detailed installation instructions for each dependency can be found on the links above.
-
-.. note:: Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
 
 1) Codex-africans can be installed in one of two ways.
 
