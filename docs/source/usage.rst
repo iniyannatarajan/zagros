@@ -4,7 +4,7 @@ Usage
 
 Zagros can be run as follows, after modifying the likelihood and prior functions according to the user's needs in the file zagros.py::
 
-    $ python zagros.py <input-ms> <ms-column> --hypo <hypo-id> --npar <no-pars> --basedir <output-dir> --fileroot <outfile-prefix>
+    python zagros.py <input-ms> <ms-column> --hypo <hypo-id> --npar <no-pars> --basedir <output-dir> --fileroot <outfile-prefix>
 
 * ``<input-ms>`` is a CASA measurement set (MS) with the observed visibilities
 * ``<ms-column>`` is the MS column containing the observed visibilities
