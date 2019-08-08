@@ -38,10 +38,11 @@ where for antenna :math:`p` and :math:`q`, and source :math:`s`:
 - :math:`K_{ps}` represents the phase delay term.
 - :math:`B_{s}` represents the brightness matrix.
 
-Miscellaneous Notes:
---------------------
-
-.. note:: This repo is intended to serve as a template. For the analysis of more specific models, a few more scripts or child repos will be added.
+Important Notes:
+----------------
 
 .. note:: The DIE and DDE Jones matrices kwargs to predict_vis() corresponding to both ant1 and ant2 must be the same; the Hermitian conjugate will be performed inside africanus;
           no need for the user to do this externally.
+
+.. note:: This repo is intended to serve as a template. For the analysis of more specific models, a few more scripts or child repos will be added.
+
