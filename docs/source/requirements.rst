@@ -4,7 +4,6 @@ Requirements & Installation
 
 Zagros requires that the following python packages are installed:
 
-   * `cupy <https://github.com/cupy/cupy>`_
    * `codex-africanus <https://github.com/ska-sa/codex-africanus>`_
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
@@ -14,15 +13,11 @@ Zagros requires that the following python packages are installed:
 Quick installation instructions:
 --------------------------------
 
+Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
+
 The following instructions should set up the environment required for running Zagros. Detailed installation instructions for each dependency can be found on the links above.
 
-1) Cupy can be installed by::
-
-    pip install cupy
-
-.. note:: Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
-
-2) Codex-africans can be installed in one of two ways.
+1) Codex-africans can be installed in one of two ways.
 
 Using pip::
 
@@ -38,7 +33,7 @@ Building from source::
 
 .. note:: Codex-africanus has many dependencies, the most important of which are cupy, dask, scipy, astropy, and python-casacore (pyrap). If building from source, make sure these are installed.
 
-3) PolyChord can be installed by downloading PolyChordLite from github::
+2) PolyChord can be installed by downloading PolyChordLite from github::
 
     git clone https://github.com/PolyChord/PolyChordLite.git
 
@@ -52,7 +47,7 @@ It is recommended that the following environment variables be set up::
     export PYTHONPATH=/path/to/PolyChordLite/pypolychord:$PYTHONPATH
     export LD_LIBRARY_PATH=/path/to/PolyChordLite/lib:$LD_LIBRARY_PATH
 
-4) dyPolyChord can be installed by::
+3) dyPolyChord can be installed by::
 
     pip install dyPolyChord
 
