@@ -13,9 +13,9 @@ Zagros requires that the following python packages are installed:
 Quick installation instructions:
 --------------------------------
 
-Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
-
 The following instructions should set up the environment required for running Zagros. Detailed installation instructions for each dependency can be found on the links above.
+
+.. note:: Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
 
 1) Codex-africans can be installed in one of two ways.
 
