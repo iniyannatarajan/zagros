@@ -47,7 +47,7 @@ And running the following commands from within the PolyChordLite directory::
     make pypolychord
     python setup.py install --user
 
-It is recommended that the following environment variables be set up:
+It is recommended that the following environment variables be set up::
 
     export PYTHONPATH=/path/to/PolyChordLite/pypolychord:$PYTHONPATH
     export LD_LIBRARY_PATH=/path/to/PolyChordLite/lib:$LD_LIBRARY_PATH
