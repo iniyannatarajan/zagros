@@ -36,7 +36,11 @@ Building from source::
 
 .. note:: Codex-africanus has many dependencies, the most important of which are cupy, dask, scipy, astropy, and python-casacore (pyrap). If building from source, make sure these are installed.
 
-2) PolyChord can be installed by downloading PolyChordLite from github::
+2) PyPolyChord for Linux can be installed using pip::
+
+    pip install pypolychord
+
+This should install PolyChord as well and is the preferred method for installing within a virtual environment. An alternative is to download the latest PolyChordLite from github::
 
     git clone https://github.com/PolyChord/PolyChordLite.git
 
@@ -45,7 +49,7 @@ And running the following commands from within the PolyChordLite directory::
     make pypolychord
     python setup.py install --user
 
-It is recommended that the following environment variables be set up::
+In this case, it is recommended that the following environment variables be set up::
 
     export PYTHONPATH=/path/to/PolyChordLite/pypolychord:$PYTHONPATH
     export LD_LIBRARY_PATH=/path/to/PolyChordLite/lib:$LD_LIBRARY_PATH
