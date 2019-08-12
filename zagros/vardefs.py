@@ -31,7 +31,7 @@ sqrtTwo=sqrt(2.0)
 
 sigmaSim=0.1 #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
 #sefds=np.array([6000,1300,560,220,2000,1600,5000,1600,4500]) # station SEFDs in Jy - from EHT2017_station_info
-
+corr_eff=0.88
 
 # Codex-africanus settings
 

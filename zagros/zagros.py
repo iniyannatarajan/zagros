@@ -149,7 +149,7 @@ def loglike(theta):
             for a1 in np.arange(data_nant):
               for a2 in np.arange(a1+1,data_nant):
                 #per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(data_chanwidth*data_inttime[bl_incr])) # INI: Removed the sq(2) from the denom. It's for 2 pols.
-                per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
+                per_bl_sig[bl_incr] = (1.0/corr_eff) * np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
                 weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr], 2)
                 bl_incr += 1;
         else:
