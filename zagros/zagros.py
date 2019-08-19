@@ -26,8 +26,9 @@ data_flag_row = None
 
 data_nant = None
 data_nbl = None
-data_uniqtime_index = None
+data_uniqtimes = None
 data_ntime = None
+data_uniqtime_indices = None
 
 data_nchan = None
 data_chanwidth = None
@@ -199,7 +200,7 @@ def loglike(theta):
 
     # Predict (forward model) visibilities
     # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
-    model_vis = predict_vis(data_uniqtime_index, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
+    model_vis = predict_vis(data_uniqtime_indices, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
@@ -251,7 +252,7 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global hypo, data_vis, data_uvw, data_uvw_cp, data_nant, data_nbl, data_uniqtime_index, data_ntime, data_inttime, \
+    global hypo, data_vis, data_uvw, data_uvw_cp, data_nant, data_nbl, data_uniqtimes, data_uniqtime_indices, data_ntime, data_inttime, \
             data_chan_freq, data_chan_freq_cp, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
 
     # Set command line parameters
@@ -279,8 +280,8 @@ def main(args):
     anttab.close()
 
     # Obtain indices of unique times in 'TIME' column
-    _, data_uniqtime_index = np.unique(tab.getcol('TIME'), return_inverse=True)
-    data_ntime = data_uniqtime_index.shape[0]
+    data_uniqtimes, data_uniqtime_indices = np.unique(tab.getcol('TIME'), return_inverse=True)
+    data_ntime = data_uniqtimes.shape[0]
     data_inttime = tab.getcol('EXPOSURE', 0, data_nbl)
 
     # Get flag info from MS
@@ -302,7 +303,7 @@ def main(args):
     data_ant1 = cp.array(data_ant1)
     data_ant2 = cp.array(data_ant2)
     data_uvw_cp = cp.array(data_uvw)
-    data_uniqtime_index = cp.array(data_uniqtime_index, dtype=cp.int32)
+    data_uniqtime_indices = cp.array(data_uniqtime_indices, dtype=cp.int32)
     data_chan_freq_cp = cp.array(data_chan_freq)
 
     '''# Set up pypolychord

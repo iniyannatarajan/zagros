@@ -62,4 +62,4 @@ pamin = np.deg2rad(0); pamax = np.deg2rad(180);
 #for Gaussian priors
 #Smu=0.149124;Ssigma=1e-4;
 
-refchan_delay=0 # index (in the MS spw table) of reference channel for delays
+refchan_delay=8 # index (in the MS spw table) of reference channel for delays
