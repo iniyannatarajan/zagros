@@ -6,15 +6,11 @@ import time
 import os
 import sys
 import scipy.constants as sc
-import pyrap.tables as pt
 #import pypolychord as ppc
 #from pypolychord.settings import PolyChordSettings
-from mpi4py import MPI
 import dyPolyChord.pypolychord_utils
 import dyPolyChord
 import numpy as np
-import cupy as cp
-from math import sqrt
 import logging
 
 #-------------------------------------------------------------------------------
@@ -24,13 +20,13 @@ deg2rad = sc.pi / 180.0;
 arcsec2rad = deg2rad / 3600.0;
 uas2rad = 1e-6 * deg2rad / 3600.0;
 
-sqrtTwo=sqrt(2.0)
+sqrtTwo=np.sqrt(2.0)
 
 #------------------------------------------------------------------------------
 # Variables for assigning weights to visibilities
 
-sigmaSim=0.1 #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
-#sefds=np.array([6000,1300,560,220,2000,1600,5000,1600,4500]) # station SEFDs in Jy - from EHT2017_station_info
+sigmaSim=None #Error on each visibility that goes into the predictions - should be the same as SIMULATION NOISE; None -> fit it
+sefds=np.array([6000,1300,560,220,2000,1600,5000,1600,4500]) # station SEFDs in Jy - from EHT2017_station_info
 corr_eff=0.88
 
 # Codex-africanus settings
@@ -49,17 +45,11 @@ seed=42
 
 # for uniform priors
 Smin=0; Smax=2 # Jy
-delaymin=-200.0*1e-12; delaymax=200e-12; # in seconds; the actual delays
 dxmin=-50*uas2rad; dxmax= 50*uas2rad; # uas
 dymin=-50*uas2rad; dymax= 50*uas2rad; # uas
-#e1min = 0*uas2rad; e1max = 40*uas2rad;
-#e2min = -40*uas2rad; e2max = 40*uas2rad;
 e1min = 0*uas2rad; e1max = 40*uas2rad;
 e2min = 0*uas2rad; e2max = 40*uas2rad;
 pamin = np.deg2rad(0); pamax = np.deg2rad(180);
 
-
 #for Gaussian priors
 #Smu=0.149124;Ssigma=1e-4;
-
-refchan_delay=8 # index (in the MS spw table) of reference channel for delays

@@ -7,6 +7,8 @@ from __future__ import print_function
 import argparse
 import pyrap.tables as pt
 
+import cupy as cp
+from mpi4py import MPI
 from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
@@ -56,19 +58,28 @@ def create_parser():
                    help="Invert UVW coordinates. Necessary to compare"
                         "codex vis against MeqTrees-generated vis")
     p.add_argument('--hypo', type=int, choices=[0,1,2], required=True)
-    #p.add_argument('--npsrc', type=int, required=True)
-    #p.add_argument('--ngsrc', type=int, required=True)
     p.add_argument('--npar', type=int, required=True)
     p.add_argument('--basedir', type=str, required=True)
     p.add_argument('--fileroot', type=str, required=True)
     return p
 
 def pol_to_rec(amp, phase):
+    """
+    Converts a complex number from polar to cartesian coordinates
+    Parameters
+    ----------
+    amp: Amplitude of a complex number
+    phase: phase of a complex number in degrees
+
+    Returns
+    -------
+    re, im: Real and imaginary parts of a complex number
+
+    """
     re = amp*np.cos(phase*np.pi/180.0)
     im = amp*np.sin(phase*np.pi/180.0)
     return re, im
 
-# INI: Flicked from MeqSilhouette
 def make_baseline_dictionary(ant_unique):
     return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
@@ -99,7 +110,7 @@ def corr_schema():
     else:
         raise ValueError("corrs %d not in (1, 2, 4)" % corrs)
 
-def einsum_schema():
+def einsum_schema(hypo):
     """
     Returns an einsum schema suitable for multiplying per-baseline
     phase and brightness terms.
@@ -114,7 +125,10 @@ def einsum_schema():
     corrs = data_vis.shape[2]
 
     if corrs == 4:
-        return "srf, srf, sij -> srfij"
+        if hypo == 0:
+            return "srf, sij -> srfij"
+        elif hypo == 1:
+            return "srf, srf, sij -> srfij"
     else:
         raise ValueError("corrs %d not in (1, 2, 4)" % corrs)
 
@@ -160,7 +174,7 @@ def loglike(theta):
         weight_vector = cp.array(weight_vector.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2)))
 
         # Compute einsum schema
-        einschema = einsum_schema()
+        einschema = einsum_schema(hypo)
 
         init_loglike = True # loglike initialised; will not enter on subsequent iterations
 
@@ -169,9 +183,10 @@ def loglike(theta):
     lm = cp.array([[theta[1], theta[2]]])
     phase = phase_delay(lm, data_uvw_cp, data_chan_freq_cp)
 
-    # Set up the shape matrix for Gaussian sources
-    gauss_shape = gaussian_shape(data_uvw, data_chan_freq, np.array([[theta[3], theta[4], theta[5]]]))
-    gauss_shape = cp.array(gauss_shape)
+    if hypo == 1:
+        # Set up the shape matrix for Gaussian sources
+        gauss_shape = gaussian_shape(data_uvw, data_chan_freq, np.array([[theta[3], theta[4], theta[5]]]))
+        gauss_shape = cp.array(gauss_shape)
 
     # Set up the brightness matrix
     stokes = cp.array([[theta[0], 0, 0, 0]])
@@ -183,24 +198,32 @@ def loglike(theta):
     print ('brightness.shape: ', brightness.shape)'''
 
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
-    source_coh_matrix =  cp.einsum(einschema, phase, gauss_shape, brightness)
-    # source_coh_matrix =  cp.einsum(einschema, phase, brightness)
-
-    #print('srccoh shape: ', source_coh_matrix.shape)
+    if hypo == 0:
+        source_coh_matrix =  cp.einsum(einschema, phase, brightness)
+    elif hypo == 1:
+        source_coh_matrix =  cp.einsum(einschema, phase, gauss_shape, brightness)
 
     ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
-    # Set up the G-Jones matrices
+    '''# Set up the G-Jones matrices
     die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
-    for ant in np.arange(data_nant):
-      for chan in np.arange(data_nchan):
-          delayterm = theta[ant+6]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 9th chan (index 8) is the reference frequency.
-          pherr = delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; pec_ph and rate are zero
-          re, im = pol_to_rec(1,pherr)
-          die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im
-
+    if hypo == 0:
+        for ant in np.arange(data_nant):
+          for chan in np.arange(data_nchan):
+              delayterm = theta[ant+12]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 17th chan (index 16) freq is the reference frequency.
+              pherr = theta[ant+3] + delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; rates are zero
+              re, im = pol_to_rec(1,pherr)
+              die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im
+    elif hypo == 1:
+        for ant in np.arange(data_nant):
+          for chan in np.arange(data_nchan):
+              delayterm = theta[ant+15]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 17th chan (index 16) freq is the reference frequency.
+              pherr = theta[ant+6] + delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; rates are zero
+              re, im = pol_to_rec(1,pherr)
+              die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im'''
+              
     # Predict (forward model) visibilities
     # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
-    model_vis = predict_vis(data_uniqtime_indices, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
+    model_vis = predict_vis(data_uniqtime_indices, data_ant1, data_ant2, die1_jones=None, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=None, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
@@ -231,17 +254,18 @@ def prior_transform(hcube):
 
     theta = []
 
-    if hypo == 0:
+    if hypo == 0: # Point source model - I, (l, m)
+        theta.append(pri.GeneralPrior(hcube[0],'U',Smin,Smax))
+        theta.append(pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
+        theta.append(pri.GeneralPrior(hcube[2],'U',dymin,dymax))
+
+    elif hypo == 1: # Gaussian source model - I, (l, m), (e_maj, e_min, p.a)
         theta.append(pri.GeneralPrior(hcube[0],'U',Smin,Smax))
         theta.append(pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
         theta.append(pri.GeneralPrior(hcube[2],'U',dymin,dymax))
         theta.append(pri.GeneralPrior(hcube[3],'U',e1min,e1max))
         theta.append(pri.GeneralPrior(hcube[4],'U',e2min,theta[3])) # ALWAYS LESS THAN theta[3]
         theta.append(pri.GeneralPrior(hcube[5],'U',pamin,pamax))
-        theta.append(pri.GeneralPrior(hcube[6],'U',delaymin,delaymax))
-        theta.append(0) # referenced to antenna 2 by default
-        for ant in range(8,8+(data_nant-2)):
-            theta.append(pri.GeneralPrior(hcube[ant],'U',delaymin,delaymax))
 
     else:
         print('*** WARNING: Illegal hypothesis')
@@ -257,18 +281,16 @@ def main(args):
 
     # Set command line parameters
     hypo = args.hypo
-    #npsrc = args.npsrc
-    #ngsrc = args.ngsrc
 
     ####### Read data from MS
-    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
+    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs for our purposes
     data_vis = tab.getcol(args.col)
     data_ant1 = tab.getcol('ANTENNA1')
     data_ant2 = tab.getcol('ANTENNA2')
     ant_unique = np.unique(np.hstack((data_ant1, data_ant2)))
     baseline_dict = make_baseline_dictionary(ant_unique)
 
-    # Read uvw coordinates; nececssary for computing the source coherency matrix
+    # Read uvw coordinates; necessary for computing the source coherency matrix
     data_uvw = tab.getcol('UVW')
     if args.invert_uvw: data_uvw = -data_uvw # Invert uvw coordinates for comparison with MeqTrees
 
@@ -306,20 +328,7 @@ def main(args):
     data_uniqtime_indices = cp.array(data_uniqtime_indices, dtype=cp.int32)
     data_chan_freq_cp = cp.array(data_chan_freq)
 
-    '''# Set up pypolychord
-    settings = PolyChordSettings(args.npar, 0)
-    settings.base_dir = args.basedir
-    settings.file_root = args.fileroot
-    settings.nlive = nlive
-    settings.num_repeats = num_repeats
-    settings.precision_criterion = evtol
-    settings.do_clustering = False # check whether this works with MPI
-    settings.read_resume = False
-    settings.seed = seed    
-
-    ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)'''
-
-    # Make a callable for running PolyChord
+    # Make a callable for running dyPolyChord
     my_callable = dyPolyChord.pypolychord_utils.RunPyPolyChord(loglike, prior_transform, args.npar)
 
     settings_dict = {'file_root': args.fileroot,
