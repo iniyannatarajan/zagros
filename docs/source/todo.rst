@@ -2,9 +2,7 @@
 TODO
 ====
 
-.. todo:: Investigate MPI usage and dyPolyChord parameters
-
-.. todo:: Verify the MeqTrees vs Montblanc vs Codex-africanus uvw convention
+.. todo:: Develop a dask-based distributed version of Zagros (potentially a different repo)
 
 .. todo:: Incorporate more complex source structures - (i) shapelets, (ii) FITS images
 

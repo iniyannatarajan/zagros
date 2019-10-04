@@ -17,6 +17,10 @@ The aim is to perform statistical analyses of radio interferometric visibilities
 The user must define the model parameters and construct their priors and the likelihood computation.
 The model construction (during each iteration of the likelihood computation) is facilitated by **codex-africanus** and the numerical sampling of the model parameteres is done by **dyPolyChord**.
 
+To distribute computation between multiple cores, use MPI::
+
+    mpirun -np <no-cores> python zagros.py <input-ms> <ms-column> --hypo <hypo-id> --npar <no-pars> --basedir <output-dir> --fileroot <outfile-prefix>
+
 Setting up the RIME:
 --------------------
 
@@ -44,5 +48,4 @@ Important Notes:
 .. note:: The DIE and DDE Jones matrices kwargs to predict_vis() corresponding to both ant1 and ant2 must be the same; the Hermitian conjugate will be performed inside africanus;
           no need for the user to do this externally.
 
-.. note:: This repo is intended to serve as a template. For the analysis of more specific models, a few more scripts or child repos will be added.
-
+.. note:: The zagros.py script can be used as a template to analyse more complex source and instrumental effects.
