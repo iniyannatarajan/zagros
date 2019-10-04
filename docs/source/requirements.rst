@@ -11,7 +11,9 @@ Zagros requires that the following python packages are installed:
 
    * `codex-africanus <https://github.com/ska-sa/codex-africanus>`_
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
+   * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
+   * `mpi4py <https://pypi.org/project/mpi4py>`_
 
 .. note:: dyPolyChord requires the installation of the C++ library PolyChord and the corresponding python wrapper pypolychord. Both are included in PolyChordLite.
 
@@ -60,6 +62,6 @@ In this case, it is recommended that the following environment variables be set 
 
 .. note:: dyPolyChord will install successfully without PolyChordLite, but for successful sampling, PolyChordLite is necessary.
 
-4) mpi4py (optional)::
+4) mpi4py (optional, for exploiting the MPI capabilities of PolyChord)::
 
     https://mpi4py.readthedocs.io/en/stable/
