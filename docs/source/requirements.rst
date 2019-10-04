@@ -59,3 +59,7 @@ In this case, it is recommended that the following environment variables be set 
     pip install dyPolyChord
 
 .. note:: dyPolyChord will install successfully without PolyChordLite, but for successful sampling, PolyChordLite is necessary.
+
+4) mpi4py (optional)::
+
+    https://mpi4py.readthedocs.io/en/stable/
