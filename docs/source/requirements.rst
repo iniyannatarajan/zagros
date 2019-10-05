@@ -30,7 +30,7 @@ Using pip::
 
     pip install codex-africanus[complete-cuda]
 
-.. note:: Without the **[complete-cuda]** option above, codex-africanus will not install dependencies such as cupy, dask, scipy, astropy, and python-casacore (pyrap). If not using cuda, use [complete].
+.. note:: Without the **[complete-cuda]** option above, codex-africanus will not install dependencies such as cupy, dask, scipy, astropy, and python-casacore (pyrap). If not using cuda, use **[complete]**.
 
 Building from source::
 
