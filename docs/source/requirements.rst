@@ -22,6 +22,8 @@ Installation:
 
 The following instructions should set up the environment required for running Zagros. Detailed installation instructions for each dependency can be found on the links above.
 
+.. note:: Use pip3 for python3.
+
 1) Codex-africans can be installed in one of two ways.
 
 Using pip::
