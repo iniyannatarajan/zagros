@@ -70,8 +70,8 @@ In this case, it is recommended that the following environment variables be set 
 
 .. note:: If using MPI, the main zagros script can be run using *mpirun* from the terminal.
 
-5) **dask-ms** is an optional package that creates xarray Datasets from CASA tables. This is needed only if the dask version of Zagros is used to read in data from CASA Measurement Sets::
+5) **dask-ms** is an optional package that creates xarray Datasets from CASA tables (needed only if CASA MSes are input to the dask-enabled version of Zagros)::
 
-   pip install dask-ms[xarray]
+    pip install dask-ms[xarray]
 
 .. note:: As noted in the dask-ms documentation, without **[xarray]**, dask-ms will still work, but with reduced off-the-shelf functionality.
