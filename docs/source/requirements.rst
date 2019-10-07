@@ -13,7 +13,7 @@ Zagros requires that the following python packages are installed:
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
    * `mpi4py <https://pypi.org/project/mpi4py>`_
-   * `dask-ms <https://github.com/ska-sa/dask-ms>`_ (Optional. See below)
+   * `dask-ms <https://github.com/ska-sa/dask-ms>`_
 
 .. note:: dyPolyChord requires the installation of the C++ library PolyChord and the corresponding python wrapper pypolychord. Both are included in PolyChordLite.
 
