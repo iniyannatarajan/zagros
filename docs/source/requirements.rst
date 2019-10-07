@@ -13,6 +13,7 @@ Zagros requires that the following python packages are installed:
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
    * `mpi4py <https://pypi.org/project/mpi4py>`_
+   * `dask-ms <https://github.com/ska-sa/dask-ms> (only if using the dask-enabled version of Zagros)`_
 
 .. note:: dyPolyChord requires the installation of the C++ library PolyChord and the corresponding python wrapper pypolychord. Both are included in PolyChordLite.
 
@@ -66,3 +67,9 @@ In this case, it is recommended that the following environment variables be set 
 4) mpi4py (optional, for exploiting the MPI capabilities of Zagros/PolyChord)::
 
     pip install mpi4py
+
+5) dask-ms is a package that creates xarray Datasets from CASA tables. This is needed only if the dask version of Zagros is used to read in data from CASA Measurement Sets::
+
+   pip install dask-ms[xarray]
+
+.. note:: As noted in the dask-ms documentation, without **[xarray]**, dask-ms will still work, but with reduced off-the-shelf functionality.
