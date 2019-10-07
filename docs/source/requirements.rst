@@ -25,13 +25,13 @@ The following instructions should set up the environment required for running Za
 
 1) Codex-africans can be installed in one of two ways.
 
-(i) Using pip::
+The first is by using pip (recommended)::
 
     pip install codex-africanus[complete-cuda]
 
 .. note:: Without the **[complete-cuda]** option above, codex-africanus will not install dependencies such as cupy, dask, scipy, astropy, and python-casacore (pyrap). If not using cuda, use **[complete]**.
 
-(ii) Building from source::
+The second way is to build from source::
 
     git clone git://github.com/ska-sa/codex-africanus
     cd codex-africanus
@@ -39,11 +39,11 @@ The following instructions should set up the environment required for running Za
 
 .. note:: Codex-africanus has many dependencies, the most important of which are cupy, dask, scipy, astropy, and python-casacore (pyrap). If building from source, make sure these are installed.
 
-2) PyPolyChord for Linux can be installed using pip::
+2) PyPolyChord for Linux can be installed using pip (recommended)::
 
     pip install pypolychord
 
-This should install PolyChord as well and is the preferred method for installation. An alternative is to download the latest PolyChordLite from github::
+An alternative is to download the latest PolyChordLite from github::
 
     git clone https://github.com/PolyChord/PolyChordLite.git
 
@@ -63,6 +63,6 @@ In this case, it is recommended that the following environment variables be set 
 
 .. note:: dyPolyChord will install successfully without PolyChordLite, but for successful running, PolyChordLite is necessary.
 
-4) mpi4py (optional, for exploiting the MPI capabilities of PolyChord)::
+4) mpi4py (optional, for exploiting the MPI capabilities of Zagros/PolyChord)::
 
     pip install mpi4py
