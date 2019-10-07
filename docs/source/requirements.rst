@@ -24,7 +24,7 @@ The following instructions should set up the environment required for running Za
 
 .. note:: Use pip3 for python3. It is highly recommended to use Python 3 going forward.
 
-1) Codex-africans can be installed in one of two ways.
+1) **Codex-africanus** can be installed in one of two ways.
 
 The first is by using pip (recommended)::
 
@@ -40,7 +40,7 @@ The second way is to build from source::
 
 .. note:: Codex-africanus has many dependencies, the most important of which are cupy, dask, scipy, astropy, and python-casacore (pyrap). If building from source, make sure these are installed.
 
-2) PyPolyChord for Linux can be installed using pip (recommended)::
+2) **PyPolyChord** for Linux can be installed using pip (recommended)::
 
     pip install pypolychord
 
@@ -58,17 +58,19 @@ In this case, it is recommended that the following environment variables be set 
     export PYTHONPATH=/path/to/PolyChordLite/pypolychord:$PYTHONPATH
     export LD_LIBRARY_PATH=/path/to/PolyChordLite/lib:$LD_LIBRARY_PATH
 
-3) dyPolyChord can be installed by::
+3) **dyPolyChord** can be installed by::
 
     pip install dyPolyChord
 
 .. note:: dyPolyChord will install successfully without PolyChordLite, but for successful running, PolyChordLite is necessary.
 
-4) mpi4py (optional, for exploiting the MPI capabilities of Zagros/PolyChord)::
+4) **mpi4py** (optional, for exploiting the MPI capabilities of Zagros/PolyChord)::
 
     pip install mpi4py
 
-5) dask-ms is an optional package that creates xarray Datasets from CASA tables. This is needed only if the dask version of Zagros is used to read in data from CASA Measurement Sets::
+.. note:: If using MPI, the main zagros script can be run using *mpirun* from the terminal.
+
+5) **dask-ms** is an optional package that creates xarray Datasets from CASA tables. This is needed only if the dask version of Zagros is used to read in data from CASA Measurement Sets::
 
    pip install dask-ms[xarray]
 
