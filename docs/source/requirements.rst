@@ -11,7 +11,6 @@ Zagros requires that the following python packages are installed:
 
    * `codex-africanus <https://github.com/ska-sa/codex-africanus>`_
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
-   * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
    * `mpi4py <https://pypi.org/project/mpi4py>`_
 
@@ -26,13 +25,13 @@ The following instructions should set up the environment required for running Za
 
 1) Codex-africans can be installed in one of two ways.
 
-Using pip::
+(i) Using pip::
 
     pip install codex-africanus[complete-cuda]
 
 .. note:: Without the **[complete-cuda]** option above, codex-africanus will not install dependencies such as cupy, dask, scipy, astropy, and python-casacore (pyrap). If not using cuda, use **[complete]**.
 
-Building from source::
+(ii) Building from source::
 
     git clone git://github.com/ska-sa/codex-africanus
     cd codex-africanus
@@ -44,11 +43,11 @@ Building from source::
 
     pip install pypolychord
 
-This should install PolyChord as well and is the preferred method for installing within a virtual environment. An alternative is to download the latest PolyChordLite from github::
+This should install PolyChord as well and is the preferred method for installation. An alternative is to download the latest PolyChordLite from github::
 
     git clone https://github.com/PolyChord/PolyChordLite.git
 
-And running the following commands from within the PolyChordLite directory::
+and running the following commands from within the PolyChordLite directory::
 
     make pypolychord
     python setup.py install --user
@@ -62,8 +61,8 @@ In this case, it is recommended that the following environment variables be set 
 
     pip install dyPolyChord
 
-.. note:: dyPolyChord will install successfully without PolyChordLite, but for successful sampling, PolyChordLite is necessary.
+.. note:: dyPolyChord will install successfully without PolyChordLite, but for successful running, PolyChordLite is necessary.
 
 4) mpi4py (optional, for exploiting the MPI capabilities of PolyChord)::
 
-    https://mpi4py.readthedocs.io/en/stable/
+    pip install mpi4py
