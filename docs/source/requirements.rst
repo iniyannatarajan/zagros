@@ -7,13 +7,14 @@ Requirements:
 
 .. note:: Zagros must be run on a machine with a CUDA-enabled GPU device. It is possible to modify zagros to not use CUDA, but the model prediction step will be slow.
 
-Zagros requires that the following python packages are installed:
+Zagros requires that the first three packages below are installed; the next three are optional, but recommended, to exploit its full potential:
 
    * `codex-africanus <https://github.com/ska-sa/codex-africanus>`_
    * `PolyChordLite <https://github.com/PolyChord/PolyChordLite>`_
    * `dyPolyChord <https://github.com/ejhigson/dyPolyChord>`_
    * `mpi4py <https://pypi.org/project/mpi4py>`_
    * `dask-ms <https://github.com/ska-sa/dask-ms>`_
+   * `dask distributed <https://distributed.dask.org/en/latest>`_
 
 .. note:: dyPolyChord requires the installation of the C++ library PolyChord and the corresponding python wrapper pypolychord. Both are included in PolyChordLite.
 
@@ -75,3 +76,7 @@ In this case, it is recommended that the following environment variables be set 
     pip install dask-ms[xarray]
 
 .. note:: As noted in the dask-ms documentation, without **[xarray]**, dask-ms will still work, but with reduced off-the-shelf functionality.
+
+6) **dask distributed** is a distributed scheduler for dask; useful when running zagros on moderately-sized clusters::
+
+    pip install dask distributed --upgrade
