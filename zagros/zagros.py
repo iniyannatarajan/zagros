@@ -8,8 +8,6 @@ from __future__ import print_function
 import argparse
 import pyrap.tables as pt
 
-import cupy as cp
-from mpi4py import MPI
 from vardefs import *
 from priors import Priors
 from africanus.rime.cuda import phase_delay, predict_vis
@@ -59,6 +57,8 @@ def create_parser():
                    help="Invert UVW coordinates. Necessary to compare"
                         "codex vis against MeqTrees-generated vis")
     p.add_argument('--hypo', type=int, choices=[0,1,2], required=True)
+    #p.add_argument('--npsrc', type=int, required=True)
+    #p.add_argument('--ngsrc', type=int, required=True)
     p.add_argument('--npar', type=int, required=True)
     p.add_argument('--basedir', type=str, required=True)
     p.add_argument('--fileroot', type=str, required=True)
@@ -81,6 +81,7 @@ def pol_to_rec(amp, phase):
     im = amp*np.sin(phase*np.pi/180.0)
     return re, im
 
+# INI: Flicked from MeqSilhouette
 def make_baseline_dictionary(ant_unique):
     return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
@@ -204,8 +205,10 @@ def loglike(theta):
     elif hypo == 1:
         source_coh_matrix =  cp.einsum(einschema, phase, gauss_shape, brightness)
 
+    #print('srccoh shape: ', source_coh_matrix.shape)
+
     ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
-    '''# Set up the G-Jones matrices
+    # Set up the G-Jones matrices
     die_jones = cp.zeros((data_ntime, data_nant, data_nchan, 2, 2), dtype=cp.complex)
     if hypo == 0:
         for ant in np.arange(data_nant):
@@ -220,11 +223,11 @@ def loglike(theta):
               delayterm = theta[ant+15]*(chan-refchan_delay)*data_chanwidth # delayterm in 'turns'; 17th chan (index 16) freq is the reference frequency.
               pherr = theta[ant+6] + delayterm*360 # convert 'turns' to degrees; pherr = pec_ph + delay + rate; rates are zero
               re, im = pol_to_rec(1,pherr)
-              die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im'''
+              die_jones[:, ant, chan, 0, 0] = die_jones[:, ant, chan, 1, 1] = re + 1j*im
               
     # Predict (forward model) visibilities
     # If the die_jones matrix has been declared above, assign it to both the kwargs die1_jones and die2_jones in predict_vis()
-    model_vis = predict_vis(data_uniqtime_indices, data_ant1, data_ant2, die1_jones=None, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=None, base_vis=None)
+    model_vis = predict_vis(data_uniqtime_indices, data_ant1, data_ant2, die1_jones=die_jones, dde1_jones=None, source_coh=source_coh_matrix, dde2_jones=None, die2_jones=die_jones, base_vis=None)
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
@@ -255,18 +258,38 @@ def prior_transform(hcube):
 
     theta = []
 
-    if hypo == 0: # Point source model - I, (l, m)
+    if hypo == 0: # 21 parameters
         theta.append(pri.GeneralPrior(hcube[0],'U',Smin,Smax))
-        theta.append(pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
-        theta.append(pri.GeneralPrior(hcube[2],'U',dymin,dymax))
+        theta.append(0)#pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
+        theta.append(0)#pri.GeneralPrior(hcube[2],'U',dymin,dymax))
+        theta.append(pri.GeneralPrior(hcube[3],'U', phasemin, phasemax))
+        theta.append(pri.GeneralPrior(hcube[4],'U', phasemin, phasemax))
+        theta.append(0) # referenced to the third station (LMT) by default
+        for ant in range(6,6+(data_nant-3)):
+            theta.append(pri.GeneralPrior(hcube[ant], 'U', phasemin, phasemax))
+        theta.append(pri.GeneralPrior(hcube[12], 'U', delaymin, delaymax))
+        theta.append(pri.GeneralPrior(hcube[13], 'U', delaymin, delaymax))
+        theta.append(0) # referenced to the third station (LMT) by default
+        for ant in range(15,15+(data_nant-3)):
+            theta.append(pri.GeneralPrior(hcube[ant],'U', delaymin, delaymax))
 
-    elif hypo == 1: # Gaussian source model - I, (l, m), (e_maj, e_min, p.a)
+    elif hypo == 1: # 24 parameters
         theta.append(pri.GeneralPrior(hcube[0],'U',Smin,Smax))
-        theta.append(pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
-        theta.append(pri.GeneralPrior(hcube[2],'U',dymin,dymax))
+        theta.append(0)#pri.GeneralPrior(hcube[1],'U',dxmin,dxmax))
+        theta.append(0)#pri.GeneralPrior(hcube[2],'U',dymin,dymax))
         theta.append(pri.GeneralPrior(hcube[3],'U',e1min,e1max))
         theta.append(pri.GeneralPrior(hcube[4],'U',e2min,theta[3])) # ALWAYS LESS THAN theta[3]
         theta.append(pri.GeneralPrior(hcube[5],'U',pamin,pamax))
+        theta.append(pri.GeneralPrior(hcube[6],'U', phasemin, phasemax))
+        theta.append(pri.GeneralPrior(hcube[7],'U', phasemin, phasemax))
+        theta.append(0) # referenced to the third station (LMT) by default
+        for ant in range(9,9+(data_nant-3)):
+            theta.append(pri.GeneralPrior(hcube[ant], 'U', phasemin, phasemax))
+        theta.append(pri.GeneralPrior(hcube[15], 'U', delaymin, delaymax))
+        theta.append(pri.GeneralPrior(hcube[16], 'U', delaymin, delaymax))
+        theta.append(0) # referenced to the third station (LMT) by default
+        for ant in range(18,18+(data_nant-3)):
+            theta.append(pri.GeneralPrior(hcube[ant],'U', delaymin, delaymax))
 
     else:
         print('*** WARNING: Illegal hypothesis')
@@ -282,16 +305,18 @@ def main(args):
 
     # Set command line parameters
     hypo = args.hypo
+    #npsrc = args.npsrc
+    #ngsrc = args.ngsrc
 
     ####### Read data from MS
-    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs for our purposes
+    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs; this code DOES NOT work for autocorrs
     data_vis = tab.getcol(args.col)
     data_ant1 = tab.getcol('ANTENNA1')
     data_ant2 = tab.getcol('ANTENNA2')
     ant_unique = np.unique(np.hstack((data_ant1, data_ant2)))
     baseline_dict = make_baseline_dictionary(ant_unique)
 
-    # Read uvw coordinates; necessary for computing the source coherency matrix
+    # Read uvw coordinates; nececssary for computing the source coherency matrix
     data_uvw = tab.getcol('UVW')
     if args.invert_uvw: data_uvw = -data_uvw # Invert uvw coordinates for comparison with MeqTrees
 
@@ -329,7 +354,20 @@ def main(args):
     data_uniqtime_indices = cp.array(data_uniqtime_indices, dtype=cp.int32)
     data_chan_freq_cp = cp.array(data_chan_freq)
 
-    # Make a callable for running dyPolyChord
+    '''# Set up pypolychord
+    settings = PolyChordSettings(args.npar, 0)
+    settings.base_dir = args.basedir
+    settings.file_root = args.fileroot
+    settings.nlive = nlive
+    settings.num_repeats = num_repeats
+    settings.precision_criterion = evtol
+    settings.do_clustering = False # check whether this works with MPI
+    settings.read_resume = False
+    settings.seed = seed    
+
+    ppc.run_polychord(loglike, args.npar, 0, settings, prior=prior_transform)'''
+
+    # Make a callable for running PolyChord
     my_callable = dyPolyChord.pypolychord_utils.RunPyPolyChord(loglike, prior_transform, args.npar)
 
     settings_dict = {'file_root': args.fileroot,
