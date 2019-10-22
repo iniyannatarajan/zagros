@@ -62,6 +62,7 @@ def create_parser():
     p.add_argument('--npar', type=int, required=True)
     p.add_argument('--basedir', type=str, required=True)
     p.add_argument('--fileroot', type=str, required=True)
+    p.add_argument('--device', type=int, default=0)
     return p
 
 def pol_to_rec(amp, phase):
@@ -345,6 +346,9 @@ def main(args):
     data_nchan = freqtab.getcol('NUM_CHAN')[0]
     data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
     freqtab.close();
+
+    # Set up the GPU
+    cp.cuda.Device(args.device).use()
 
     # Move necessary arrays to cupy from numpy
     data_vis = cp.array(data_vis)
