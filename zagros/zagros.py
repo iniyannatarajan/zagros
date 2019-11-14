@@ -5,38 +5,38 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
-import pyrap.tables as pt
-
-import cupy as cp
-from mpi4py import MPI
 from vardefs import *
 from priors import Priors
-from africanus.rime.cuda import phase_delay, predict_vis
+
+import argparse
+from mpi4py import MPI
+from scipy.constants import pi
+
+import dask
+import dask.array as da
+from daskms import xds_from_table
+
+from africanus.rime.dask import phase_delay, predict_vis
 from africanus.coordinates import radec_to_lm
-from africanus.model.coherency.cuda import convert # convert between correlations and Stokes parameters
+from africanus.model.coherency.dask import convert # convert between correlations and Stokes parameters
 from africanus.model.shape import gaussian as gaussian_shape
 
 # Global variables related to input data
 data_vis = None # variable to hold input data matrix
 data_uvw = None
-data_uvw_cp = None
 data_ant1 = None
 data_ant2 = None
 data_inttime = None
-data_flag = None
-data_flag_row = None
+data_flags = None
 
 data_nant = None
 data_nbl = None
-data_uniqtimes = None
 data_ntime = None
 data_uniqtime_indices = None
 
 data_nchan = None
 data_chanwidth = None
 data_chan_freq=None # Frequency of each channel. NOTE: Can handle only one SPW.
-data_chan_freq_cp=None # Frequency of each channel. NOTE: Can handle only one SPW.
 
 # Global variables to be computed / used for bookkeeping
 baseline_dict = None # Constructed in main()
@@ -48,13 +48,12 @@ einschema = None
 
 # Other global vars that will be set through command-line
 hypo = None
-#npsrc = None
-#ngsrc = None
 
 def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms", help="Input MS name")
     p.add_argument("col", help="Name of the data column from MS")
+    p.add_argument("-rc", "--row-chunks", type=int, default=10000)
     p.add_argument("-iuvw", "--invert-uvw", action="store_true",
                    help="Invert UVW coordinates. Necessary to compare"
                         "codex vis against MeqTrees-generated vis")
@@ -153,26 +152,28 @@ def loglike(theta):
 
         # Find total number of visibilities
         ndata = data_vis.shape[0]*data_vis.shape[1]*data_vis.shape[2]*2 # 8 because each polarisation has two real numbers (real & imaginary)
-        flag_ll = np.logical_not(data_flag[:,0,0])
-        ndata_unflagged = ndata - np.where(flag_ll == False)[0].shape[0] * 8
+        flag_ll = da.logical_not(data_flags[:,0,0])
+        ndata_unflagged = ndata - da.where(flag_ll == False)[0].shape[0] * 8
+        flag_ll, ndata_unflagged = dask.compute(flag_ll, ndata_unflagged)
         print ('Percentage of unflagged visibilities: ', ndata_unflagged, '/', ndata, '=', (ndata_unflagged/ndata)*100)
 
         # Set visibility weights
-        weight_vector=np.zeros(data_vis.shape, dtype='float') # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
+        weight_vector=da.zeros(data_vis.shape, dtype='float') # ndata/2 because the weight_vector is the same for both real and imag parts of the vis.
         if not sigmaSim:
-            per_bl_sig = np.zeros((data_nbl))
+            per_bl_sig = da.zeros((data_nbl))
             bl_incr = 0;
-            for a1 in np.arange(data_nant):
-              for a2 in np.arange(a1+1,data_nant):
+            for a1 in da.arange(data_nant):
+              for a2 in da.arange(a1+1,data_nant):
                 #per_bl_sig[bl_incr] = np.sqrt((sefds[a1]*sefds[a2])/(data_chanwidth*data_inttime[bl_incr])) # INI: Removed the sq(2) from the denom. It's for 2 pols.
-                per_bl_sig[bl_incr] = (1.0/corr_eff) * np.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
-                weight_vector[baseline_dict[(a1,a2)]] = 1.0 / np.power(per_bl_sig[bl_incr], 2)
+                per_bl_sig[bl_incr] = (1.0/corr_eff) * da.sqrt((sefds[a1]*sefds[a2])/(2*data_chanwidth*data_inttime[bl_incr])) # INI: Added the sq(2) bcoz MeqS uses this convention
+                weight_vector[baseline_dict[(a1,a2)]] = 1.0 / da.power(per_bl_sig[bl_incr], 2)
                 bl_incr += 1;
         else:
             weight_vector[:] = 1.0 /np.power(sigmaSim, 2)
 
-        weight_vector *= np.logical_not(data_flag)
-        weight_vector = cp.array(weight_vector.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2)))
+        weight_vector *= da.logical_not(data_flags)
+        weight_vector = weight_vector.reshape((weight_vector.shape[0], weight_vector.shape[1], 2, 2))
+        weight_vector = weight_vector.compute()
 
         # Compute einsum schema
         einschema = einsum_schema(hypo)
@@ -181,17 +182,16 @@ def loglike(theta):
 
     # Set up arrays necessary for forward modelling
     # Set up the phase delay matrix
-    lm = cp.array([[theta[1], theta[2]]])
-    phase = phase_delay(lm, data_uvw_cp, data_chan_freq_cp)
+    lm = da.from_array([[theta[1], theta[2]]])
+    phase = phase_delay(lm, data_uvw, data_chan_freq)
 
     if hypo == 1:
         # Set up the shape matrix for Gaussian sources
-        gauss_shape = gaussian_shape(data_uvw, data_chan_freq, np.array([[theta[3], theta[4], theta[5]]]))
-        gauss_shape = cp.array(gauss_shape)
+        gauss_shape = gaussian_shape(data_uvw, data_chan_freq, da.from_array([[theta[3], theta[4], theta[5]]]))
 
     # Set up the brightness matrix
-    stokes = cp.array([[theta[0], 0, 0, 0]])
-    brightness =  convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
+    stokes = da.from_array([[theta[0], 0, 0, 0]])
+    brightness = convert(stokes, ['I', 'Q', 'U', 'V'], [['RR', 'RL'], ['LR', 'LL']])
 
     '''print ('einschema: ', einschema)
     print ('phase.shape: ', phase.shape)
@@ -200,9 +200,9 @@ def loglike(theta):
 
     # Compute the source coherency matrix (the uncorrupted visibilities, except for the phase delay)
     if hypo == 0:
-        source_coh_matrix =  cp.einsum(einschema, phase, brightness)
+        source_coh_matrix =  da.einsum(einschema, phase, brightness)
     elif hypo == 1:
-        source_coh_matrix =  cp.einsum(einschema, phase, gauss_shape, brightness)
+        source_coh_matrix =  da.einsum(einschema, phase, gauss_shape, brightness)
 
     ### Uncomment the following and assign sampled complex gains per ant/chan/time to the Jones matrices
     '''# Set up the G-Jones matrices
@@ -228,10 +228,10 @@ def loglike(theta):
 
     # Compute chi-squared and loglikelihood
     diff = model_vis - data_vis.reshape((data_vis.shape[0], data_vis.shape[1], 2, 2))
-    chi2 = cp.sum((diff.real*diff.real+diff.imag*diff.imag) * weight_vector)
-    loglike = cp.float(-chi2/2.0 - cp.log(2*cp.pi*(1.0/weight_vector.flatten()[cp.nonzero(weight_vector.flatten())])).sum())
+    chi2 = da.sum((diff.real*diff.real+diff.imag*diff.imag) * weight_vector)
+    loglike = -chi2/2.0 - da.log(2*pi*(1.0/weight_vector.flatten()[da.nonzero(weight_vector.flatten())])).sum()
 
-    return loglike, []
+    return loglike.compute(), []
 
 #------------------------------------------------------------------------------
 pri=None
@@ -277,14 +277,16 @@ def prior_transform(hcube):
 
 def main(args):
 
-    global hypo, data_vis, data_uvw, data_uvw_cp, data_nant, data_nbl, data_uniqtimes, data_uniqtime_indices, data_ntime, data_inttime, \
-            data_chan_freq, data_chan_freq_cp, data_nchan, data_chanwidth, data_flag, data_flag_row, data_ant1, data_ant2, baseline_dict
+    global hypo, data_vis, data_uvw, data_nant, data_nbl, data_uniqtime_indices, data_ntime, data_inttime, \
+            data_chan_freq, data_nchan, data_chanwidth, data_flags, data_ant1, data_ant2, baseline_dict
 
     # Set command line parameters
     hypo = args.hypo
 
-    ####### Read data from MS
-    tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs for our purposes
+    ###################
+    # Read data from MS
+    ###################
+    '''tab = pt.table(args.ms).query("ANTENNA1 != ANTENNA2"); # INI: always exclude autocorrs for our purposes
     data_vis = tab.getcol(args.col)
     data_ant1 = tab.getcol('ANTENNA1')
     data_ant2 = tab.getcol('ANTENNA2')
@@ -310,7 +312,7 @@ def main(args):
     # Get flag info from MS
     data_flag = tab.getcol('FLAG')
     data_flag_row = tab.getcol('FLAG_ROW')
-    data_flag = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
+    data_flags = np.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
 
     tab.close()
 
@@ -319,15 +321,62 @@ def main(args):
     data_chan_freq = freqtab.getcol('CHAN_FREQ')[0]
     data_nchan = freqtab.getcol('NUM_CHAN')[0]
     data_chanwidth = freqtab.getcol('CHAN_WIDTH')[0,0];
-    freqtab.close();
+    freqtab.close();'''
 
-    # Move necessary arrays to cupy from numpy
+    ds = xds_from_table(args.ms, columns=[args.col, 'ANTENNA1', 'ANTENNA2', 'UVW', 'TIME', 'EXPOSURE', 'FLAG', 'FLAG_ROW'], \
+            chunks={'row':args.row_chunks}, taql_where='ANTENNA1 != ANTENNA2')
+
+    if args.col == 'DATA':
+        data_vis = ds[0].DATA.data
+    elif args.col == 'CORRECTED_DATA':
+        data_vis = ds[0].CORRECTED_DATA.data
+    elif args.col == 'MODEL_DATA':
+        data_vis = ds[0].MODEL_DATA.data
+
+    # Construct baseline dictionary for later use in keeping track of which rows correspond to which baselines.
+    data_ant1 = ds[0].ANTENNA1.data
+    data_ant2 = ds[0].ANTENNA2.data
+    ant_unique = da.unique(da.hstack((data_ant1, data_ant2)))
+
+    # Get uvw coords for passing to predict_vis
+    data_uvw = -ds.UVW.data if args.invert_uvw else ds.UVW.data # Invert uvw coordinates for comparison with MeqTrees
+
+    # get data from ANTENNA subtable
+    antds = xds_from_table(args.ms+'::ANTENNA')
+    data_nant = antds[0].STATION.shape[0]
+    data_nbl = int((data_nant*(data_nant-1))/2)
+
+    # Obtain indices of unique times in 'TIME' column
+    data_uniqtimes, data_uniqtime_indices = da.unique(ds[0].TIME.data, return_inverse=True)
+
+    # Get flag info from MS
+    data_flag = ds[0].FLAG.data
+    data_flag_row = ds[0].FLAG_ROW.data
+    data_flags = da.logical_or(data_flag, data_flag_row[:,np.newaxis,np.newaxis])
+
+    # get frequency info from SPECTRAL_WINDOW subtable
+    freqds = xds_from_table(args.ms+'::SPECTRAL_WINDOW')
+
+    '''# Move necessary arrays to cupy from numpy
     data_vis = cp.array(data_vis)
     data_ant1 = cp.array(data_ant1)
     data_ant2 = cp.array(data_ant2)
     data_uvw_cp = cp.array(data_uvw)
     data_uniqtime_indices = cp.array(data_uniqtime_indices, dtype=cp.int32)
-    data_chan_freq_cp = cp.array(data_chan_freq)
+    data_chan_freq_cp = cp.array(data_chan_freq)'''
+
+    # Persist and/or compute necessary dask arrays and store a few int/float values or numpy arrays
+    data_vis, data_ant1, data_ant2, data_uvw, data_uniqtime_indices, data_flags = dask.persist(data_vis, data_ant1, data_ant2, data_uvw, data_uniqtime_indices, data_flags)
+    ant_unique, data_uniqtimes = dask.compute(ant_unique, data_uniqtimes) # this assumes that the list of unique antennas will fit in memory (and they should!)
+
+    baseline_dict = make_baseline_dictionary(ant_unique) # make baseline dict
+    data_ntime = data_uniqtimes.shape[0] # store time-related values
+    data_inttime = ds[0].EXPOSURE.values[0]
+    data_chan_freq = freqds[0].CHAN_FREQ.values[0][0] # store freq-related values
+    data_nchan = freqds[0].NUM_CHAN.values[0]
+    data_chanwidth = freqds[0].CHAN_WIDTH.values[0][0]
+
+    del ds, antds, freqds # these datasets will not be used again and can be safely deleted from memory; everything necessary has been put in persistent storage (dask, float, int, numpy)
 
     # Make a callable for running dyPolyChord
     my_callable = dyPolyChord.pypolychord_utils.RunPyPolyChord(loglike, prior_transform, args.npar)
