@@ -74,10 +74,10 @@ def _merge_bl_exp(per_bl_exp, axis, keepdims):
 
 def baseline_exposure(baseline_meta, exposure):
     """
-    Performs a reduction creating unique exposures per baseline
+    Performs a reduction creating unique exposures per baseline dictionary
     """
 
-    # Find per-bl unique exposures per array chunk
+    # Find per-bl unique exposures per array chunk dictionary
     per_bl_exp = da.blockwise(_per_bl_exp, ("row",),
                               baseline_meta, ("row",),
                               exposure, ("row",),
@@ -116,20 +116,22 @@ def chunk_shapes(array):
     return da.Array(graph, name, chunks, dtype=np.object)
 
 
-def _baseline_sigma(sefd, chan_width, bl_exp):
+def _baseline_sigma(sefd, chan_width, bl_exp, corr_eff):
     """
     Create {(a1, a2): sigma} dictionary for each baseline
     """
+    # contraction over the ant+chan dimensions, so data returned as a list
     assert isinstance(sefd, list)
     assert isinstance(chan_width, list)
     sefd = sefd[0]
     chan_width = chan_width[0]
+    inv_c = 1.0 / corr_eff
 
-    return {(a1, a2): np.sqrt(sefd[a1]*sefd[a2]/(2*chan_width[0]*exp[0]))
+    return {(a1, a2): inv_c*np.sqrt(sefd[a1]*sefd[a2]/(2*chan_width[0]*exp[0]))
             for (a1, a2), exp in bl_exp.items()}
 
 
-def baseline_sigma(baseline_exposure, sefd, chan_width):
+def baseline_sigma(baseline_exposure, sefd, chan_width, corr_eff=1.0):
     """
     Create dask array of a single chunk represented by a dictionary
     holding the sigmas for each unique baseline
@@ -140,6 +142,7 @@ def baseline_sigma(baseline_exposure, sefd, chan_width):
                         sefd, ("ant",),
                         chan_width, ("chan",),
                         baseline_exposure, (),
+                        corr_eff, None,
                         meta=np.empty((), dtype=np.object),
                         dtype=np.object)
 
@@ -194,7 +197,6 @@ if __name__ == "__main__":
         bl_meta = baseline_meta(ds.ANTENNA1.data, ds.ANTENNA2.data)
         bl_exp = baseline_exposure(bl_meta, ds.EXPOSURE.data)
         bl_sigma = baseline_sigma(bl_exp, sefd, spw.CHAN_WIDTH.data[0])
-
         weight = create_weight_vector(ds.DATA.data, bl_sigma, bl_meta)
 
         results.append(weight)
