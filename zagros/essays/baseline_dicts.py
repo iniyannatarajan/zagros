@@ -32,20 +32,14 @@ def _noop(chunk, axis, keepdims):
 def _merge_bl_exp(per_bl_exp, axis, keepdims):
     # List of unique exposures per baseline
     if isinstance(per_bl_exp, list):
-        result = {}
+        result = defaultdict(list)
 
         for d in per_bl_exp:
             for ant_pair, uexp in d.items():
-                try:
-                    existing_uexp = result[ant_pair]
-                except KeyError:
-                    # Assign
-                    result[ant_pair] = uexp
-                else:
-                    # Merge exposure arrays
-                    result[ant_pair] = np.unique([uexp, existing_uexp])
+                result[ant_pair].append(uexp)
 
-        return result
+        return {k: np.unique(v) for k, v in result.items()}
+
     # Easy singleton case
     elif isinstance(per_bl_exp, dict):
         return per_bl_exp
