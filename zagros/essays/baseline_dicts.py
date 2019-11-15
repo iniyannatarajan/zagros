@@ -7,7 +7,7 @@ import dask
 import dask.array as da
 import numpy as np
 
-from daskms import xds_from_ms
+from daskms import xds_from_ms, xds_from_table
 
 
 def create_parser():
@@ -57,7 +57,24 @@ args = create_parser().parse_args()
 
 ubl_exps = []
 
+
+ddid_ds = xds_from_table("::".join((args.ms, "DATA_DESCRIPTION")))[0].compute()
+spw_ds = [ds.compute() for ds in
+          xds_from_table("::".join((args.ms, "SPECTRAL_WINDOW")),
+                         group_cols="__row__")]
+pol_ds = [ds.compute() for ds in
+          xds_from_table("::".join((args.ms, "POLARIZATION")),
+                         group_cols="__row__")]
+
+
 for ds in xds_from_ms(args.ms, chunks={"row": args.row_chunks}):
+    spw_id = ddid_ds.SPECTRAL_WINDOW_ID.values[ds.DATA_DESC_ID]
+    pol_id = ddid_ds.POLARIZATION_ID.values[ds.DATA_DESC_ID]
+    spw = spw_ds[spw_id]
+    pol = pol_ds[pol_id]
+
+    assert tuple(map(len, ds.FLAG.data.chunks[1:])) == (1, 1)
+
     per_bl_exp = da.blockwise(_per_bl_exp, ("row",),
                               ds.ANTENNA1.data, ("row",),
                               ds.ANTENNA2.data, ("row",),
