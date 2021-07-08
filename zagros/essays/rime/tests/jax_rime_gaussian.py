@@ -1,11 +1,13 @@
 from functools import partial
 
 import numpy as np
+from scipy.constants import c as lightspeed
 
 import jax.numpy as jnp
 from jax import jit, vmap
-from jax import lax
-from scipy.constants import c as lightspeed
+from jax import lax, ops
+from jax.experimental import loops
+
 
 minus_two_pi_over_c = -2*jnp.pi/lightspeed
 
@@ -13,13 +15,9 @@ minus_two_pi_over_c = -2*jnp.pi/lightspeed
 def gaussian(uvw, frequency, shape_params):
     # https://en.wikipedia.org/wiki/Full_width_at_half_maximum
 
-    two = uvw.dtype.type(2.0)
-    one = uvw.dtype.type(1.0)
-    zero = uvw.dtype.type(0.0)
-
-    fwhm = two * jnp.sqrt(two * jnp.log(two))
-    fwhminv = one / fwhm
-    gauss_scale = fwhminv * jnp.sqrt(two) * jnp.pi / lightspeed
+    fwhm = 2. * jnp.sqrt(2. * jnp.log(2.))
+    fwhminv = 1. / fwhm
+    gauss_scale = fwhminv * jnp.sqrt(2.) * jnp.pi / lightspeed
 
     dtype = jnp.result_type(*(jnp.dtype(a.dtype.name) for
                              a in (uvw, frequency, shape_params)))
@@ -28,38 +26,43 @@ def gaussian(uvw, frequency, shape_params):
     nrow = uvw.shape[0]
     nchan = frequency.shape[0]
  
-    shape = jnp.empty((nsrc, nrow, nchan), dtype=dtype)
-    scaled_freq = jnp.empty_like(frequency)
- 
-    # Scale each frequency
-    for f in range(frequency.shape[0]):
-        #scaled_freq[f] = frequency[f] * gauss_scale
-        scaled_freq = scaled_freq.at[f].set(frequency[f] * gauss_scale)
- 
-    for s in range(shape_params.shape[0]):
-        emaj, emin, angle = shape_params[s]
- 
-        # Convert to l-projection, m-projection, ratio
-        el = emaj * jnp.sin(angle)
-        em = emaj * jnp.cos(angle)
-        er = emin / emaj
-        #er = emin / (one if emaj == zero else emaj)
- 
-        for r in range(uvw.shape[0]):
-            u, v, w = uvw[r]
- 
-            u1 = (u*em - v*el)*er
-            v1 = u*el + v*em
- 
-            for f in range(scaled_freq.shape[0]):
-                fu1 = u1*scaled_freq[f]
-                fv1 = v1*scaled_freq[f]
- 
-                #shape[s, r, f] = jnp.exp(-(fu1*fu1 + fv1*fv1))
-                shape = shape.at[s, r, f].set(jnp.exp(-(fu1*fu1 + fv1*fv1)))
- 
-    return shape
+    with loops.Scope() as l1:
+        l1.scaled_freq = jnp.empty_like(frequency)
 
+        for f in l1.range(frequency.shape[0]):
+            l1.scaled_freq = ops.index_update(l1.scaled_freq, f, frequency[f] * gauss_scale)
+    
+    with loops.Scope() as l2:
+        l2.shape = jnp.empty((nsrc, nrow, nchan), dtype=dtype)
+
+        l2.emaj, l2.emin, l2.angle = jnp.array([0, 0, 0], dtype=shape_params.dtype)
+        l2.el, l2.em, l2.er = jnp.array([0, 0, 0], dtype=shape_params.dtype)
+
+        l2.u, l2.v, l2.w = jnp.array([0, 0, 0], dtype=uvw.dtype)
+
+        l2.u1, l2.v1, l2.fu1, l2.fv1 = jnp.array([0, 0, 0, 0], dtype=dtype)
+
+        for s in l2.range(shape_params.shape[0]):
+            l2.emaj, l2.emin, l2.angle = shape_params[s]
+
+            # Convert to l-projection, m-projection, ratio
+            l2.el = l2.emaj * jnp.sin(l2.angle)
+            l2.em = l2.emaj * jnp.cos(l2.angle)
+            l2.er = lax.cond(l2.emaj == 0., lambda _: l2.emin/1., lambda _: l2.emin/l2.emaj, operand=None)
+
+            for r in l2.range(uvw.shape[0]):
+                l2.u, l2.v, l2.w = uvw[r]
+
+                l2.u1 = (l2.u*l2.em - l2.v*l2.el)*l2.er
+                l2.v1 = l2.u*l2.el + l2.v*l2.em
+
+                for f in l2.range(l1.scaled_freq.shape[0]):
+                    l2.fu1 = l2.u1*l1.scaled_freq[f]
+                    l2.fv1 = l2.v1*l1.scaled_freq[f]
+
+                    l2.shape = ops.index_update(l2.shape, (s, r, f), jnp.exp(-(l2.fu1*l2.fu1 + l2.fv1*l2.fv1)))
+
+    return l2.shape
 
 @jit
 def phase_delay(lm, uvw, frequency):
@@ -88,11 +91,17 @@ def phase_delay(lm, uvw, frequency):
 @jit
 def brightness(stokes):
     return jnp.stack([
+        stokes[:, 0] + stokes[:, 3],
+        stokes[:, 1] + stokes[:, 2]*1j,
+        stokes[:, 1] - stokes[:, 2]*1j,
+        stokes[:, 0] - stokes[:, 3]],
+        axis=1)
+    '''return jnp.stack([
         stokes[:, 0] + stokes[:, 1]*0j,
         stokes[:, 2] + stokes[:, 3]*1j,
         stokes[:, 2] - stokes[:, 3]*1j,
         stokes[:, 0] - stokes[:, 1]*0j],
-        axis=1)
+        axis=1)'''
 
 
 @jit
@@ -110,8 +119,6 @@ def fused_rime(lm, uvw, frequency, shape_params, stokes):
     # return jnp.einsum("srf,si->rfi",
     #                   phase_delay(lm, uvw, frequency),
     #                   brightness(stokes))
-
-
 
     source = lm.shape[0]
     row = uvw.shape[0]
