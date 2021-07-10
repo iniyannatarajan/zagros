@@ -6,7 +6,7 @@ import pyrap.tables as pt
 import jax.config
 import jax.numpy as jnp
 
-from jax_rime_gaussian import fused_rime
+from zagros.essays.rime.jax_rime import fused_rime
 
 # define some constants
 deg2rad = jnp.pi / 180.0;
@@ -15,7 +15,7 @@ uas2rad = 1e-6 * deg2rad / 3600.0;
 
 # define global variables
 lm = jnp.array([[0*uas2rad, 0*uas2rad]]) # dims: nsrc x 2
-shape_params = jnp.array([[20*uas2rad, 20*uas2rad, jnp.deg2rad(0)]])
+shape_params = jnp.array([[0*uas2rad, 0*uas2rad, jnp.deg2rad(0)]])
 stokes = jnp.array([[1.6,0,0,0.5]]) # dims: nsrc x 4
 nsrc = 1
 
