@@ -127,14 +127,14 @@ def fused_rime(lm, uvw, frequency, shape_params, stokes):
     def body(s, vis):
         phdelay = phase_delay(lm[None, s], uvw, frequency)
         brness = brightness(stokes[None, s])
-        '''coh = jnp.einsum("srf,si->rfi",
+        coh = jnp.einsum("srf,si->rfi",
                          phdelay,
-                         brness)'''
-        gauss_shape = gaussian(uvw, frequency, shape_params[None, s])
+                         brness)
+        '''gauss_shape = gaussian(uvw, frequency, shape_params[None, s])
         coh = jnp.einsum("srf,srf,si->rfi",
                          phdelay,
                          gauss_shape,
-                         brness)
+                         brness)'''
 
         return vis + coh.astype(dtype)
 
