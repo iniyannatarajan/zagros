@@ -4,7 +4,7 @@
 
 import sys
 import argparse
-from numpy import arange
+import numpy as np
 import pyrap.tables as pt
 
 
@@ -26,7 +26,70 @@ def regularize_ms(msname):
 
     # Get all baselines
     tab = pt.table(msname)
-    t1 = tab.sort('unique ANTENNA1,ANTENNA2')
+
+    # Make list of missing antennas
+    ant1=tab.getcol('ANTENNA1')
+    ant2=tab.getcol('ANTENNA2')
+
+    ants_present = np.unique(np.hstack((ant1,ant2)))
+
+    anttab=pt.table(msname+'::ANTENNA')
+    ants_anttab = np.arange(anttab.nrows())
+    anttab.close()
+
+    ants_missing = [x for x in ants_anttab if x not in ants_present]
+    ants_missing = np.array(ants_missing)
+
+    combos = []
+    for ii in ants_missing:
+        for jj in ants_present:
+            if ii > jj:
+                combos.append((jj,ii))
+            else:
+                combos.append((ii,jj))
+
+    for ii in np.arange(0, ants_missing.shape[0]):
+        for jj in np.arange(ii+1, ants_missing.shape[0]):
+            if ants_missing[ii] < ants_missing[jj]:
+                combos.append((ants_missing[ii], ants_missing[jj]))
+            elif ants_missing[ii] < ants_missing[jj]:
+                combos.append((ants_missing[jj], ants_missing[ii]))
+
+    combos.sort()
+    print(f'Missing baselines: {combos}')
+
+    # Ensure the unique antenna permutations in $t1 also contain antennas in ANTENNA that are missing from MAIN
+    t1=tab.sort('unique ANTENNA1,ANTENNA2')
+    t1.copy('uniqants.ms',deep=True)
+    t1.close()
+
+    # Assign values to be used in TaQL
+    data = tab.getcol('DATA')
+    nrows = data.shape[0]
+    nchan = data.shape[1]
+    ncorr = data.shape[2]
+
+    t1=pt.table('uniqants.ms')
+    for bl in combos:
+        pt.taql('insert into $t1 (ANTENNA1,ANTENNA2,DATA,FLAG) VALUES ($bl[0], $bl[1], array([0+0i], [$nchan, $ncorr]), array([True], [$nchan, $ncorr]))')
+
+    if 'MODEL_DATA' in tab.colnames():
+        pt.taql('update $t1 set MODEL_DATA=array([0+0i], [$nchan, $ncorr])')
+    if 'CORRECTED_DATA' in tab.colnames():
+        pt.taql('update $t1 set CORRECTED_DATA=array([0+0i], [$nchan, $ncorr])')
+    if 'WEIGHT' in tab.colnames():
+        pt.taql('update $t1 set WEIGHT=array([1], [$ncorr])')
+    if 'SIGMA' in tab.colnames():
+        pt.taql('update $t1 set SIGMA=array([1], [$ncorr])')
+    if 'WEIGHT_SPECTRUM' in tab.colnames():
+        pt.taql('update $t1 set WEIGHT_SPECTRUM=array([1], [$nchan, $ncorr])')
+    if 'SIGMA_SPECTRUM' in tab.colnames():
+        pt.taql('update $t1 set SIGMA_SPECTRUM=array([1], [$nchan, $ncorr])')
+
+    t1.sort('unique ANTENNA1,ANTENNA2').rename('uniqants_sorted.ms')
+    t1.close()
+
+    t1 = pt.table('uniqants_sorted.ms')
     nadded = 0
 
     # Iterate in time and band over the MS
@@ -52,8 +115,8 @@ def regularize_ms(msname):
                 t2.copyrows(tnew)
 
             # set the correct time and band in the new rows.
-            tnew.putcell('TIME', arange(nadded, nadded+nmissing), tsub.getcell('TIME',0))
-            tnew.putcell('DATA_DESC_ID', arange(nadded, nadded+nmissing), tsub.getcell('DATA_DESC_ID',0))
+            tnew.putcell('TIME', np.arange(nadded, nadded+nmissing), tsub.getcell('TIME',0))
+            tnew.putcell('DATA_DESC_ID', np.arange(nadded, nadded+nmissing), tsub.getcell('DATA_DESC_ID',0))
             nadded += nmissing # update nadded
 
     # close tables
@@ -75,15 +138,16 @@ def regularize_ms(msname):
         t2.close()
         tcombs.close()
 
-        print(msprefix+"_regularized.MS", 'contains the regularized MS.')
-
-    else:
-        print(f"{msname} is already regularized. No changes made.")
-
-    # close tables before exiting
+    # close and delete tables before exiting
     t1.close()
+    pt.tabledelete('uniqants_sorted.ms')
+    pt.tabledelete('uniqants.ms')
     tab.close()
 
+    if nadded > 0:
+        print(msprefix+"_regularized.MS", 'contains the regularized MS.')
+    else:
+        print(f"{msname} is already regularized. No changes made.")
 
 def main():
     # Parse the input arguments
