@@ -50,10 +50,7 @@ def regularize_ms(msname):
 
     for ii in np.arange(0, ants_missing.shape[0]):
         for jj in np.arange(ii+1, ants_missing.shape[0]):
-            if ants_missing[ii] < ants_missing[jj]:
-                combos.append((ants_missing[ii], ants_missing[jj]))
-            elif ants_missing[ii] < ants_missing[jj]:
-                combos.append((ants_missing[jj], ants_missing[ii]))
+            combos.append((ants_missing[ii], ants_missing[jj]))
 
     combos.sort()
     print(f'Missing baselines: {combos}')
