@@ -67,22 +67,32 @@ def create_parser():
 
 def pol_to_rec(amp, phase):
     """
-    Converts a complex number from polar to cartesian coordinates
-    Parameters
-    ----------
-    amp: Amplitude of a complex number
-    phase: phase of a complex number in degrees
+    Function to convert a complex number from polar to Cartesian coordinates. 
+    
+    Args:
+      amp (float): amplitude of the complex number
+      phase (float): phase of the complex number, in degrees
 
-    Returns
-    -------
-    re, im: Real and imaginary parts of a complex number
-
+    Returns:
+      (float): real part of the complex number
+      (float): imaginary part of the complex number
     """
+
     re = amp*np.cos(phase*np.pi/180.0)
     im = amp*np.sin(phase*np.pi/180.0)
     return re, im
 
 def make_baseline_dictionary(ant_unique):
+    """
+    Function to generate a dictionary of baseline combinations.
+
+    Args:
+      ant_unique (numpy.ndarray): Array of unique antenna ids
+
+    Returns:
+      (dict): dictionary containing baseline combinations
+    """
+
     return dict([((x, y), np.where((data_ant1 == x) & (data_ant2 == y))[0]) for x in ant_unique for y in ant_unique if y > x])
 
 # INI: For handling different correlation schema; not used as of now

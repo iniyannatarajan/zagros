@@ -13,6 +13,7 @@ Zagros documentation
    readme
    requirements
    usage
+   api
    todo
    history
 
